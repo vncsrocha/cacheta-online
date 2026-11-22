@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cacheta.Core", "Cacheta.Core\Cacheta.Core.csproj", "{1486B42F-D2C1-46E8-84F8-51F49EE3E0EC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cacheta.Tests", "Cacheta.Tests\Cacheta.Tests.csproj", "{2FB2FE5C-BD01-4827-B788-A59E984AEFD2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cacheta.Cli", "Cacheta.Cli\Cacheta.Cli.csproj", "{6B458D2B-B45C-4770-94B4-1FCAE063546D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1486B42F-D2C1-46E8-84F8-51F49EE3E0EC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1486B42F-D2C1-46E8-84F8-51F49EE3E0EC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1486B42F-D2C1-46E8-84F8-51F49EE3E0EC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1486B42F-D2C1-46E8-84F8-51F49EE3E0EC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2FB2FE5C-BD01-4827-B788-A59E984AEFD2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2FB2FE5C-BD01-4827-B788-A59E984AEFD2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2FB2FE5C-BD01-4827-B788-A59E984AEFD2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2FB2FE5C-BD01-4827-B788-A59E984AEFD2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6B458D2B-B45C-4770-94B4-1FCAE063546D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6B458D2B-B45C-4770-94B4-1FCAE063546D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6B458D2B-B45C-4770-94B4-1FCAE063546D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6B458D2B-B45C-4770-94B4-1FCAE063546D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,17 @@
+{
+  "name": "com.vncsrocha.cacheta.core",
+  "version": "0.1.0",
+  "displayName": "Cacheta Core",
+  "description": "Motor de regras da Cacheta (C# puro, sem dependência de Unity): baralho, curingas, validação de jogos, rodadas, tentos e bots.",
+  "unity": "2021.3",
+  "author": {
+    "name": "vncsrocha"
+  },
+  "samples": [
+    {
+      "displayName": "Mesa local (exemplo)",
+      "description": "MonoBehaviour mínimo: você contra bots, logando os eventos.",
+      "path": "Samples~/MesaLocal"
+    }
+  ]
+}
