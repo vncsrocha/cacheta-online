@@ -33,7 +33,7 @@ namespace Cacheta.App
         private static Shader _lit, _unlit, _toon;
         private static bool _toonSearched;
 
-        /// <summary>Shader de contorno + sombreado chapado (Assets/Shaders/ToonOutline.shader). Nulo se não existir.</summary>
+        /// <summary>Shader de contorno + sombreado chapado (Assets/Resources/Shaders/ToonOutline.shader). Nulo se não existir.</summary>
         public static Shader Toon
         {
             get
