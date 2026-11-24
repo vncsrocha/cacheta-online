@@ -13,6 +13,7 @@ unity-package/com.vncsrocha.cacheta.core/   pacote Unity (o código de verdade f
   Runtime/Game/       CachetaMatch (partida, rodadas, tentos), GameEvent, PlayerView
   Runtime/Bots/       SimpleBot (fácil/médio/difícil), BotDriver
   Samples~/MesaLocal/ exemplo de MonoBehaviour usando o motor
+UnityProject/                              projeto Unity com a mesa de teste (Assets/Scripts/MesaCacheta.cs)
 dotnet/                                    projetos .NET que compilam o mesmo código fora do Unity
   Cacheta.Core/       biblioteca netstandard2.1 / C# 9 (mesmas restrições do Unity)
   Cacheta.Tests/      testes xUnit
@@ -31,13 +32,26 @@ dotnet run --project Cacheta.Cli -- --bots 5        # você contra 5 bots
 dotnet run --project Cacheta.Cli -- --sim 100       # 100 partidas de 6 bots, com estatísticas
 ```
 
-## Usando no Unity
+## Testando no Unity (mesa de teste)
 
-No projeto Unity: **Window > Package Manager > + > Add package from disk...** e escolha
-`unity-package/com.vncsrocha.cacheta.core/package.json`. O exemplo "Mesa local" aparece na aba Samples do pacote.
+A pasta `UnityProject/` é um projeto Unity pronto, que já aponta para o pacote do motor.
+
+1. Instale o [Unity Hub](https://unity.com/download) e uma versão **Unity 6 LTS** (6000.x). 2022.3 LTS também serve.
+2. No Hub: **Add > Add project from disk** e escolha a pasta `UnityProject`.
+   Se o Hub disser que a versão do projeto não está instalada, escolha a sua versão 6000.x e confirme.
+3. A primeira abertura demora alguns minutos (o Unity monta a pasta Library).
+4. Aperte **Play**. Não precisa montar cena: a mesa é criada sozinha em qualquer cena.
+
+Na mesa: escolha número de bots e dificuldade, clique no **monte** ou no **descarte** para comprar,
+clique numa carta da mão para selecioná-la e use **Descartar** ou **Bater**. Com "dicas" ligadas, as cartas
+que já estão em jogo ficam com borda verde e o botão Bater acende quando dá para bater.
+Curingas têm borda dourada e uma estrela. A arte é provisória (desenhada por código) e vai ser trocada.
+
+Para usar o motor em outro projeto Unity: **Window > Package Manager > + > Add package from disk...** e escolha
+`unity-package/com.vncsrocha.cacheta.core/package.json`.
 
 Regra de ouro: a cena **nunca** muda o estado do jogo por conta própria. Ela chama ações
-(`DrawFromStock`, `DrawFromDiscard`, `Discard`, `Bater`), recebe `ActionResult` e anima a partir dos
+(`DrawFromStock`, `DrawFromDiscard`, `Discard`, `Bater`), recebe `ActionResult` e reage aos
 `GameEvent`. Assim, no online basta trocar a chamada local por uma mensagem ao servidor.
 
 ## Regras padrão ("regra da casa")
