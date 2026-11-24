@@ -288,7 +288,8 @@ namespace Cacheta.App
                 _app.Stage.SetEnvironment(env); // pré-visualiza o ambiente atrás do menu
             }
             y += row + gap;
-            room.Bots = UiKit.Selector(new Rect(x, y, w, row), "Bots na mesa", room.Bots - 1, 7, i => (i + 1).ToString()) + 1;
+            // Cacheta Clássica: de 3 a 8 jogadores, então de 2 a 7 bots.
+            room.Bots = UiKit.Selector(new Rect(x, y, w, row), "Jogadores na mesa", Mathf.Clamp(room.Bots, 2, 7) - 2, 6, i => (i + 3).ToString()) + 2;
             y += row + gap;
             room.Difficulty = UiKit.Selector(new Rect(x, y, w, row), "Dificuldade", room.Difficulty, Names.Of);
             y += row + gap;

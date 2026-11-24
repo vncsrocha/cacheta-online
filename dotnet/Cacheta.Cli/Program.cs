@@ -27,7 +27,7 @@ static void Simulate(int matches, ulong seed)
     var wins = new int[6];
     var rounds = new List<int>();
     var turnsPerRound = new List<int>();
-    int clean = 0, bateu = 0, annulled = 0;
+    int clean = 0, bateu = 0, annulled = 0, vai = 0, decisoes = 0, semDisputa = 0, atravessou = 0, furado = 0, dez = 0;
     var sw = Stopwatch.StartNew();
     for (int g = 0; g < matches; g++)
     {
@@ -44,6 +44,11 @@ static void Simulate(int matches, ulong seed)
             if (e.Type == GameEventType.Discarded || e.Type == GameEventType.Bateu) turns++;
             if (e.Type == GameEventType.Bateu) { bateu++; if (e.Clean) clean++; turnsPerRound.Add(turns); turns = 0; }
             if (e.Type == GameEventType.RoundAnnulled) { annulled++; turns = 0; }
+            if (e.Type == GameEventType.Decidiu) { decisoes++; vai += e.Amount; }
+            if (e.Type == GameEventType.RodadaSemDisputa) { semDisputa++; turns = 0; }
+            if (e.Type == GameEventType.BaterFurado) furado++;
+            if (e.Type == GameEventType.Bateu && e.Atravessando) atravessou++;
+            if (e.Type == GameEventType.Bateu && e.BatidaDeDez) dez++;
         }
     }
     Console.WriteLine($"{matches} partidas de 6 bots em {sw.Elapsed.TotalSeconds:F1}s");
@@ -51,6 +56,8 @@ static void Simulate(int matches, ulong seed)
     Console.WriteLine($"Rodadas por partida: média {rounds.Average():F1}");
     Console.WriteLine($"Jogadas por rodada (todos os jogadores): média {turnsPerRound.Average():F1}");
     Console.WriteLine($"Batidas limpas: {100.0 * clean / Math.Max(1, bateu):F0}%   rodadas anuladas: {annulled}");
+    Console.WriteLine($"Vai: {100.0 * vai / Math.Max(1, decisoes):F0}% das decisões   rodadas sem disputa: {semDisputa} de {semDisputa + bateu + annulled}");
+    Console.WriteLine($"Batidas atravessando: {atravessou}   batidas de 10: {dez}   bater furado: {furado}");
 }
 
 static void PlayInteractive(int botCount, ulong seed)

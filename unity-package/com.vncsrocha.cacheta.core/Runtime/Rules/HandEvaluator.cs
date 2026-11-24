@@ -39,6 +39,53 @@ namespace Cacheta.Core
             return best;
         }
 
+        /// <summary>
+        /// Batida de 10 cartas: as 10 cartas formam 2 jogos de 3 e 1 sequência de 4 (o curinga pode estar nela).
+        /// Devolve a organização encontrada ou null.
+        /// </summary>
+        public static HandArrangement BatidaDeDez(IReadOnlyList<Card> hand, RuleSet rules, JokerInfo jokers)
+        {
+            if (hand == null || hand.Count != 10) return null;
+            jokers = jokers ?? JokerInfo.None;
+            // Toda batida de 10 é uma mão completa; se a mão nem fecha, não precisa procurar.
+            if (!Arrange(hand, rules, jokers).IsComplete) return null;
+            HandArrangement best = null;
+            var four = new List<Card>(4);
+            for (int a = 0; a < 10; a++)
+            for (int b = a + 1; b < 10; b++)
+            for (int c = b + 1; c < 10; c++)
+            for (int d = c + 1; d < 10; d++)
+            {
+                four.Clear();
+                four.Add(hand[a]); four.Add(hand[b]); four.Add(hand[c]); four.Add(hand[d]);
+                if (!SameSuitIgnoringJokers(four, jokers)) continue;
+                var seq = Arrange(four, rules, jokers);
+                if (!seq.IsComplete || seq.Melds.Count != 1 || seq.Melds[0].Type != MeldType.Sequencia) continue;
+                var rest = new List<Card>(6);
+                for (int i = 0; i < 10; i++) if (i != a && i != b && i != c && i != d) rest.Add(hand[i]);
+                var six = Arrange(rest, rules, jokers);
+                if (!six.IsComplete) continue; // 6 cartas completas sempre se dividem em 2 jogos de 3
+                var melds = new List<Meld>(six.Melds) { seq.Melds[0] };
+                var arr = new HandArrangement(melds, new List<Card>(), six.WildsUsed + seq.WildsUsed);
+                if (best == null || arr.WildsUsed < best.WildsUsed) best = arr;
+                if (best.WildsUsed == 0) return best;
+            }
+            return best;
+        }
+
+        /// <summary>As cartas que não são curinga têm todas o mesmo naipe (filtro rápido para sequência).</summary>
+        private static bool SameSuitIgnoringJokers(List<Card> cards, JokerInfo jokers)
+        {
+            Suit? suit = null;
+            foreach (var c in cards)
+            {
+                if (jokers.IsJoker(c)) continue;
+                if (suit == null) suit = c.Suit;
+                else if (c.Suit != suit) return false;
+            }
+            return true;
+        }
+
         /// <summary>Verdadeiro se todas as cartas podem ser baixadas em jogos.</summary>
         public static bool IsComplete(IReadOnlyList<Card> hand, RuleSet rules, JokerInfo jokers)
             => Arrange(hand, rules, jokers).IsComplete;

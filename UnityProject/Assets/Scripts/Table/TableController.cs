@@ -93,6 +93,10 @@ namespace Cacheta.App
         private bool _paused;
         private OptionsPanel _options;
         private bool _confirmBater;
+        private bool _confirmAtravessar;
+        private int _semDisputa = -1;        // quem ganhou a rodada porque os outros correram
+        private string _atravessarChecked;   // cada descarte dá uma chance só para os bots atravessarem
+        private bool _hintCanAtravessar;
         private float _nextBot;
         private string _hintKey;
         private HashSet<int> _hintInMeld = new HashSet<int>();
@@ -236,6 +240,8 @@ namespace Cacheta.App
         private void NextRound()
         {
             _lastBater = null;
+            _semDisputa = -1;
+            _confirmAtravessar = false;
             _annulled = false;
             _selected = null;
             _lastDrawn = null;
@@ -275,7 +281,22 @@ namespace Cacheta.App
                         Fly(null, _stockPos, HeldAnchor(e.Seat), false);
                     }
                     break;
+                case GameEventType.Decidiu:
+                    Log(e.Seat == Me ? (e.Amount == 1 ? "Você vai" : "Você correu") : $"{who} {(e.Amount == 1 ? "vai" : "correu")}");
+                    break;
+                case GameEventType.SentadoDeFora:
+                    Log(e.Seat == Me ? "Você cumpre esta rodada de fora (bateu furado)" : $"{who} cumpre a rodada de fora");
+                    break;
+                case GameEventType.RodadaSemDisputa:
+                    _semDisputa = e.Seat;
+                    Log($"{(e.Seat == Me ? "Você ganhou" : who + " ganhou")} sem jogar: os outros correram");
+                    break;
+                case GameEventType.BaterFurado:
+                    Log(e.Seat == Me ? "Você bateu furado! Fica a próxima rodada de fora." : $"{who} bateu furado e fica a próxima rodada de fora");
+                    if (e.Seat == Me) _app.Toast("Bateu furado: a mão não fechava. Você fica a próxima rodada de fora.");
+                    break;
                 case GameEventType.DrewFromDiscard:
+                    if (e.Message == "atravessando") Log($"{(e.Seat == Me ? "Você pegou" : who + " pegou")} {e.Card} atravessando!");
                     if (e.Seat == Me)
                     {
                         _order.Add(e.Card.Value.Id);
@@ -284,7 +305,7 @@ namespace Cacheta.App
                     }
                     else
                     {
-                        Log($"{who} pegou {e.Card} do descarte");
+                        if (e.Message != "atravessando") Log($"{who} pegou {e.Card} do descarte");
                         Fly(e.Card, _discardPos, HeldAnchor(e.Seat), false);
                     }
                     break;
@@ -299,7 +320,7 @@ namespace Cacheta.App
                 case GameEventType.Bateu:
                     _lastBater = e;
                     if (e.Seat == Me && e.Card.HasValue) DiscardMyView(e.Card.Value.Id);
-                    Log($"{who} BATEU{(e.Clean ? " LIMPO" : "")}! Os outros perdem {e.Amount}.");
+                    Log($"{who} BATEU{(e.BatidaDeDez ? " DE 10" : "")}{(e.Atravessando ? " ATRAVESSANDO" : "")}! Quem foi perde {e.Amount}.");
                     break;
                 case GameEventType.RoundAnnulled:
                     _annulled = true;
@@ -368,6 +389,32 @@ namespace Cacheta.App
             if (Result(_match.Bater(Me, Card.FromId(_selected.Value)))) _selected = null;
         }
 
+        private void DoDecide(bool vai)
+        {
+            if (!MyTurn(TurnPhase.Decidir)) return;
+            if (Result(_match.Decide(Me, vai))) _nextBot = Time.time + _app.Settings.BotDelay;
+        }
+
+        /// <summary>Pega o descarte de outro fora da vez para bater. Se a mão não fechar, é bater furado.</summary>
+        private void DoAtravessar()
+        {
+            _confirmAtravessar = false;
+            if (_paused || !_match.CanAtravessar(Me)) return;
+            Card? discard = _selected.HasValue ? Card.FromId(_selected.Value) : (Card?)null;
+            if (!discard.HasValue)
+            {
+                // Sem carta escolhida só vale a batida de 10 (fica com as 10 cartas na mão).
+                var hand = _match.GetHand(Me).ToList();
+                hand.Add(_match.DiscardTop.Value);
+                if (HandEvaluator.BatidaDeDez(hand, _match.Rules, _match.Jokers) == null)
+                {
+                    _app.Toast("Escolha a carta que vai descartar para bater");
+                    return;
+                }
+            }
+            if (Result(_match.BaterAtravessando(Me, discard))) _selected = null;
+        }
+
         private bool Result(ActionResult r)
         {
             if (!r.Ok) _app.Toast(r.Error);
@@ -401,7 +448,16 @@ namespace Cacheta.App
             if (_match == null) return;
             float dt = Time.deltaTime;
 
-            // Bots
+            // Bots: logo depois de um descarte, qualquer bot pode bater atravessando (uma chance por descarte).
+            if (!_paused && !_match.IsOver && _match.Phase == TurnPhase.Comprar && _match.AtravessarFrom >= 0 && Time.time >= _nextBot)
+            {
+                string key = _match.RoundNumber + "|" + _match.AtravessarFrom + "|" + _match.DiscardTop?.Id;
+                if (key != _atravessarChecked)
+                {
+                    _atravessarChecked = key;
+                    if (BotDriver.TryAtravessar(_match, _bots, s => s != Me)) _nextBot = Time.time + _app.Settings.BotDelay;
+                }
+            }
             if (!_paused && !_match.IsOver && _match.Phase != TurnPhase.FimDaRodada && _match.CurrentSeat != Me && Time.time >= _nextBot)
             {
                 var r = BotDriver.Step(_match, _bots[_match.CurrentSeat]);
@@ -534,7 +590,8 @@ namespace Cacheta.App
         {
             for (int s = 1; s < _match.PlayerCount; s++)
             {
-                int want = _match.IsEliminated(s) ? 0 : _match.GetHand(s).Count;
+                var st = _match.GetStatus(s);
+                int want = st == SeatStatus.Vai || st == SeatStatus.Decidindo ? _match.GetHand(s).Count : 0;
                 var list = _heldBacks[s];
                 if (list.Count != want)
                 {
@@ -631,16 +688,23 @@ namespace Cacheta.App
         private void UpdateHints()
         {
             var hand = _match.GetHand(Me);
-            string key = string.Join(",", hand.Select(c => c.Id).OrderBy(i => i)) + "|" + _match.Phase + "|" + _match.CurrentSeat;
+            string key = string.Join(",", hand.Select(c => c.Id).OrderBy(i => i)) + "|" + _match.Phase + "|" + _match.CurrentSeat
+                         + "|" + _match.AtravessarFrom + "|" + _match.DiscardTop?.Id;
             if (key == _hintKey) return;
             _hintKey = key;
             _hintInMeld = new HashSet<int>();
             _hintCanBater = false;
+            _hintCanAtravessar = false;
             if (hand.Count == 0) return;
             var arr = HandEvaluator.Arrange(hand, _match.Rules, _match.Jokers);
             foreach (var m in arr.Melds) foreach (var c in m.Cards) _hintInMeld.Add(c.Id);
             if (_match.CurrentSeat == Me && _match.Phase == TurnPhase.Descartar)
                 _hintCanBater = SimpleBot.FindBater(hand, _match.GetView(Me), _match.PickedFromDiscard).HasValue;
+            if (_match.CanAtravessar(Me))
+            {
+                var top = _match.DiscardTop.Value;
+                _hintCanAtravessar = SimpleBot.FindBater(hand.Concat(new[] { top }).ToList(), _match.GetView(Me), top).HasValue;
+            }
         }
 
         // ================================================================ entrada (mouse/teclado via IMGUI, funciona com qualquer sistema de input)
@@ -648,7 +712,7 @@ namespace Cacheta.App
         private void HandleWorldInput(bool roundOver)
         {
             var e = Event.current;
-            if (_paused || _confirmBater) return;
+            if (_paused || _confirmBater || _confirmAtravessar) return;
             if (roundOver && (e.type == EventType.MouseDown || e.type == EventType.MouseDrag || e.type == EventType.MouseUp) && e.button == 0) return;
             Vector2 screen = GUIUtility.GUIToScreenPoint(e.mousePosition);
             var ray = _cam.ScreenPointToRay(new Vector3(screen.x, Screen.height - screen.y, 0));
@@ -751,6 +815,7 @@ namespace Cacheta.App
             bool roundOver = _match.Phase == TurnPhase.FimDaRodada || _match.IsOver;
             if (roundOver && _flyers.Count == 0) DrawRoundEnd();
             if (_confirmBater) DrawConfirmBater();
+            if (_confirmAtravessar) DrawConfirmAtravessar();
             if (_paused) DrawPause();
 
             HandleWorldInput(roundOver);
@@ -772,7 +837,19 @@ namespace Cacheta.App
                 UiKit.Label(new Rect(r.x + 10, r.y + 4, r.width - 20, 30),
                     _match.PlayerNames[s] + (_match.DealerSeat == s ? "  (D)" : ""), UiKit.Small, txt);
                 UiKit.Label(new Rect(r.x + 10, r.y + 34, r.width - 20, 30),
-                    out_ ? "fora da mesa" : $"{_match.GetTentos(s)} tentos  ·  {_match.GetHand(s).Count} cartas", UiKit.Tiny, txt);
+                    out_ ? "fora da mesa" : $"{_match.GetTentos(s)} tentos  ·  {StatusText(s)}", UiKit.Tiny, txt);
+            }
+        }
+
+        private string StatusText(int s)
+        {
+            switch (_match.GetStatus(s))
+            {
+                case SeatStatus.Decidindo: return "pensando...";
+                case SeatStatus.Correu: return "correu";
+                case SeatStatus.Sentado: return "de fora";
+                case SeatStatus.Eliminado: return "fora da mesa";
+                default: return $"vai  ·  {_match.GetHand(s).Count} cartas";
             }
         }
 
@@ -787,9 +864,14 @@ namespace Cacheta.App
             string turn;
             if (_match.Phase == TurnPhase.FimDaRodada || _match.IsOver) turn = "";
             else if (_match.CurrentSeat == Me)
-                turn = _match.Phase == TurnPhase.Comprar
+                turn = _match.Phase == TurnPhase.Decidir
+                    ? $"Vira {_match.Jokers.Vira}: olhe sua mão. Vai ou corre?"
+                    : _match.Phase == TurnPhase.Comprar
                     ? "Sua vez: clique no MONTE ou no DESCARTE"
                     : "Sua vez: arraste uma carta até o descarte (ou selecione e Bata)";
+            else if (_match.GetStatus(Me) == SeatStatus.Correu) turn = $"Você correu nesta rodada  ·  vez de {_match.PlayerNames[_match.CurrentSeat]}";
+            else if (_match.GetStatus(Me) == SeatStatus.Sentado) turn = "Você está de fora nesta rodada (bateu furado)";
+            else if (_match.Phase == TurnPhase.Decidir) turn = $"{_match.PlayerNames[_match.CurrentSeat]} está decidindo se vai...";
             else turn = $"Vez de {_match.PlayerNames[_match.CurrentSeat]}...";
             if (turn.Length > 0)
             {
@@ -829,7 +911,7 @@ namespace Cacheta.App
                 string nm = s == Me ? "Você" : _match.PlayerNames[s];
                 if (nm.Length > 9) nm = nm.Substring(0, 9);
                 UiKit.Label(new Rect(r.x + 4, r.y, r.width - 8, 22), nm, UiKit.Tiny, turn ? Color.black : Color.white);
-                UiKit.Label(new Rect(r.x + 4, r.y + 18, r.width - 8, 22), $"♥{_match.GetTentos(s)}  {_match.GetHand(s).Count}c", UiKit.Tiny,
+                UiKit.Label(new Rect(r.x + 4, r.y + 18, r.width - 8, 22), $"♥{_match.GetTentos(s)}  {MiniStatus(s)}", UiKit.Tiny,
                             turn ? Color.black : new Color(1, 1, 1, 0.8f));
             }
 
@@ -843,9 +925,44 @@ namespace Cacheta.App
             }
         }
 
+        private string MiniStatus(int s)
+        {
+            var st = _match.GetStatus(s);
+            return st == SeatStatus.Correu ? "correu" : st == SeatStatus.Sentado ? "fora" : st == SeatStatus.Decidindo ? "?" : $"{_match.GetHand(s).Count}c";
+        }
+
         private void DrawBottomBar()
         {
             float y = UiKit.H - 90, x = 30;
+            var before0 = GUI.backgroundColor;
+
+            // Vai ou corre: a vira já está na mesa e você vê a sua mão.
+            if (MyTurn(TurnPhase.Decidir))
+            {
+                GUI.backgroundColor = new Color(0.4f, 1f, 0.4f);
+                if (GUI.Button(new Rect(x, y, 260, 64), "Vou!", UiKit.Selected)) DoDecide(true);
+                GUI.backgroundColor = before0;
+                if (GUI.Button(new Rect(x + 275, y, 260, 64), "Corro", UiKit.Button)) DoDecide(false);
+                if (GUI.Button(new Rect(x + 550, y, 210, 64), "Organizar", UiKit.Button)) ArrangeByMelds();
+                if (GUI.Button(new Rect(x + 775, y, 250, 64), _zoom ? "Vista da mesa" : "Ver minha mão", UiKit.Button)) _zoom = !_zoom;
+                UiKit.Label(new Rect(x, y - 36, 1400, 30),
+                    $"Correr: perde {_match.Rules.TentosLostCorreu} tento  •  ir e perder: {_match.Rules.TentosLostFoi}  •  batida de 10 vale mais ({_match.Rules.TentosLostCorreuBatidaDeDez} e {_match.Rules.TentosLostFoiBatidaDeDez})",
+                    UiKit.Tiny, new Color(1, 1, 1, 0.75f));
+                return;
+            }
+
+            // Bater atravessando: pegar o descarte de outro fora da vez, só para bater.
+            if (_match.CanAtravessar(Me) && !_paused)
+            {
+                bool glowA = _app.Settings.ShowHints && _hintCanAtravessar;
+                if (glowA) GUI.backgroundColor = Color.yellow;
+                if (GUI.Button(new Rect(UiKit.W / 2 - 200, y - 110, 400, 64), glowA ? "BATER ATRAVESSANDO!" : "Bater atravessando", UiKit.Button))
+                {
+                    if (_app.Settings.ConfirmBater) _confirmAtravessar = true;
+                    else DoAtravessar();
+                }
+                GUI.backgroundColor = before0;
+            }
             bool discardPhase = MyTurn(TurnPhase.Descartar);
 
             GUI.enabled = discardPhase && _selected.HasValue;
@@ -879,8 +996,11 @@ namespace Cacheta.App
             if (_match.IsOver)
                 title = _match.WinnerSeat == Me ? "Você levou a mesa!" : $"{_match.PlayerNames[_match.WinnerSeat ?? 0]} levou a mesa!";
             else if (_annulled) title = "Rodada anulada (o monte acabou)";
+            else if (_semDisputa >= 0)
+                title = (_semDisputa == Me ? "Você ganhou" : $"{_match.PlayerNames[_semDisputa]} ganhou") + " sem jogar: todo mundo correu!";
             else if (_lastBater != null)
-                title = (_lastBater.Seat == Me ? "Você bateu" : $"{_match.PlayerNames[_lastBater.Seat]} bateu") + (_lastBater.Clean ? " LIMPO!" : "!");
+                title = (_lastBater.Seat == Me ? "Você bateu" : $"{_match.PlayerNames[_lastBater.Seat]} bateu")
+                        + (_lastBater.BatidaDeDez ? " DE 10" : "") + (_lastBater.Atravessando ? " atravessando" : "") + "!";
             else title = "Fim da rodada";
             UiKit.Label(new Rect(r.x, r.y + 25, r.width, 60), title, UiKit.Subtitle);
 
@@ -901,7 +1021,11 @@ namespace Cacheta.App
                 }
                 if (_lastBater.Card.HasValue)
                     GUI.Label(new Rect(r.x + 40, y + 160, 600, 30), $"Descartou {_lastBater.Card.Value}", UiKit.Small);
-                GUI.Label(new Rect(r.x + 40, y + 200, r.width - 80, 36), $"Cada um dos outros perdeu {_lastBater.Amount} tento(s).", UiKit.Text);
+                var rules = _match.Rules;
+                int correu = _lastBater.BatidaDeDez ? rules.TentosLostCorreuBatidaDeDez : rules.TentosLostCorreu;
+                GUI.Label(new Rect(r.x + 40, y + 200, r.width - 80, 36),
+                    rules.VaiOuCorre ? $"Quem foi perdeu {_lastBater.Amount} tento(s). Quem correu perdeu {correu}." : $"Cada um dos outros perdeu {_lastBater.Amount} tento(s).",
+                    UiKit.Text);
             }
 
             string tentos = string.Join("    ", Enumerable.Range(0, _match.PlayerCount)
@@ -923,6 +1047,17 @@ namespace Cacheta.App
             GUI.Label(new Rect(r.x, r.y + 30, r.width, 50), $"Bater descartando {Card.FromId(_selected ?? 0)}?", UiKit.Center);
             if (GUI.Button(new Rect(r.x + 60, r.yMax - 100, 260, 70), "Cancelar", UiKit.Button)) _confirmBater = false;
             if (GUI.Button(new Rect(r.xMax - 320, r.yMax - 100, 260, 70), "Bater!", UiKit.Selected)) DoBater();
+        }
+
+        private void DrawConfirmAtravessar()
+        {
+            var r = new Rect(UiKit.W / 2 - 400, UiKit.H / 2 - 140, 800, 280);
+            UiKit.Panel(r, 0.92f);
+            string what = _selected.HasValue ? $"pegando {_match.DiscardTop} e descartando {Card.FromId(_selected.Value)}" : $"pegando {_match.DiscardTop} (batida de 10)";
+            GUI.Label(new Rect(r.x, r.y + 30, r.width, 50), $"Bater atravessando, {what}?", UiKit.Center);
+            GUI.Label(new Rect(r.x, r.y + 85, r.width, 40), "Se a mão não fechar, é bater furado: você fica a próxima rodada de fora.", UiKit.Center);
+            if (GUI.Button(new Rect(r.x + 80, r.yMax - 100, 260, 70), "Cancelar", UiKit.Button)) _confirmAtravessar = false;
+            if (GUI.Button(new Rect(r.xMax - 340, r.yMax - 100, 260, 70), "Bater!", UiKit.Selected)) DoAtravessar();
         }
 
         private void DrawPause()

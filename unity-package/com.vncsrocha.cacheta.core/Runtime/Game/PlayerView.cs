@@ -25,6 +25,10 @@ namespace Cacheta.Core
         public int RoundNumber { get; }
         public TurnPhase Phase { get; }
         public Card? PickedFromDiscard { get; }
+        /// <summary>Situação de cada jogador na rodada (vai, correu, sentado...).</summary>
+        public IReadOnlyList<SeatStatus> Status { get; }
+        /// <summary>Se este jogador pode pedir para bater atravessando com o descarte de cima agora.</summary>
+        public bool CanAtravessar { get; }
 
         public bool IsMyTurn => CurrentSeat == Seat;
 
@@ -45,6 +49,8 @@ namespace Cacheta.Core
             RoundNumber = m.RoundNumber;
             Phase = m.Phase;
             PickedFromDiscard = m.PickedFromDiscard;
+            Status = Enumerable.Range(0, m.PlayerCount).Select(m.GetStatus).ToList();
+            CanAtravessar = m.CanAtravessar(seat);
         }
     }
 }

@@ -13,7 +13,7 @@ using UnityEngine;
 /// </summary>
 public class MesaLocalExemplo : MonoBehaviour
 {
-    [Range(1, 7)] public int numeroDeBots = 3;
+    [Range(2, 7)] public int numeroDeBots = 3;
     public BotDifficulty dificuldade = BotDifficulty.Medio;
     public float pausaDosBots = 0.8f;
 
@@ -49,6 +49,8 @@ public class MesaLocalExemplo : MonoBehaviour
             else if (_match.CurrentSeat != 0)
             {
                 yield return new WaitForSeconds(pausaDosBots);
+                // Antes de comprar, qualquer bot pode bater atravessando com o descarte de outro.
+                if (_match.Phase == TurnPhase.Comprar && BotDriver.TryAtravessar(_match, _bots, s => s != 0)) continue;
                 BotDriver.Step(_match, _bots[_match.CurrentSeat]);
             }
             else yield return null; // vez do jogador humano
@@ -56,6 +58,9 @@ public class MesaLocalExemplo : MonoBehaviour
     }
 
     // Ligue estes métodos a botões / arrastar cartas.
+    public void Vou() => Log(_match.Decide(0, true));
+    public void Corro() => Log(_match.Decide(0, false));
+    public void BaterAtravessando(int cardIdDescarte) => Log(_match.BaterAtravessando(0, Card.FromId(cardIdDescarte)));
     public void ComprarDoMonte() => Log(_match.DrawFromStock(0));
     public void ComprarDoDescarte() => Log(_match.DrawFromDiscard(0));
     public void Descartar(int cardId) => Log(_match.Discard(0, Card.FromId(cardId)));

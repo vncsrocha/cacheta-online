@@ -5,6 +5,10 @@ namespace Cacheta.Core
     public enum GameEventType
     {
         RoundStarted,
+        Decidiu,            // público: o jogador disse se vai (Amount = 1) ou corre (Amount = 0)
+        RodadaSemDisputa,   // público: todos correram menos um, que ganhou a rodada sem jogar
+        BaterFurado,        // público: pediu para bater atravessando sem ter a mão; fica a próxima rodada de fora
+        SentadoDeFora,      // público: o jogador está cumprindo a rodada de fora
         HandDealt,          // privado: as cartas que o jogador recebeu
         DrewFromStock,      // público: alguém comprou do monte (sem mostrar a carta)
         CardReceived,       // privado: qual carta veio do monte
@@ -34,6 +38,10 @@ namespace Cacheta.Core
         public int Amount;
         public bool Clean;
         public bool FirstTurn;
+        /// <summary>Batida de 10 cartas (2 jogos de 3 e 1 sequência de 4).</summary>
+        public bool BatidaDeDez;
+        /// <summary>Bateu pegando o descarte de outro jogador fora da vez.</summary>
+        public bool Atravessando;
         public string Message;
 
         public bool IsVisibleTo(int seat) => VisibleToSeat == null || VisibleToSeat == seat;

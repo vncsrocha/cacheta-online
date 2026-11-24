@@ -135,7 +135,7 @@ namespace Cacheta.App
 
     public static class Names
     {
-        public static string Of(GameMode m) => m == GameMode.Cachetex ? "Cachetex" : "Cacheta tradicional";
+        public static string Of(GameMode m) => m == GameMode.Cachetex ? "Carteado" : "Cacheta Clássica";
 
         public static string Of(EnvironmentId e)
         {

@@ -21,8 +21,12 @@ namespace Cacheta.Core.Bots
     /// <summary>Qualquer jogador automático. Recebe só a <see cref="PlayerView"/>, nunca o estado completo.</summary>
     public interface IBot
     {
+        /// <summary>Vai (true) ou corre (false), olhando a mão e a vira.</summary>
+        bool ChooseVai(PlayerView view);
         DrawSource ChooseDraw(PlayerView view);
         TurnDecision ChooseAction(PlayerView view);
+        /// <summary>Se quer bater atravessando com o descarte de cima (e como). Nulo = não.</summary>
+        TurnDecision? ChooseAtravessar(PlayerView view);
     }
 
     public enum BotDifficulty
@@ -59,6 +63,42 @@ namespace Cacheta.Core.Bots
                     default: return 0.0;
                 }
             }
+        }
+
+        public bool ChooseVai(PlayerView v)
+        {
+            // Mão de 9 cartas: quantas ficam soltas e quantas estão quase formando jogo.
+            double score = Score(v.Hand, v);
+            int myTentos = v.Tentos[v.Seat];
+            // Limite de risco: quanto menor a pontuação, melhor a mão. Com poucos tentos, joga mais seguro.
+            // (Mão inicial típica: 45 a 75. Abaixo de 50 já tem jogo formado ou quase.)
+            double limit = _difficulty == BotDifficulty.Facil ? 66 : _difficulty == BotDifficulty.Medio ? 61 : 57;
+            if (myTentos <= 2) limit -= 8;
+            if (_difficulty == BotDifficulty.Facil && _rng.Next(100) < 25) return _rng.Next(2) == 0;
+            // Se todos antes correram e sobra pouca gente decidindo, vale arriscar mais.
+            int going = 0, deciding = 0;
+            for (int s = 0; s < v.Status.Count; s++)
+            {
+                if (s == v.Seat) continue;
+                if (v.Status[s] == SeatStatus.Vai) going++;
+                if (v.Status[s] == SeatStatus.Decidindo) deciding++;
+            }
+            if (going == 0 && deciding <= 1) limit += 10;
+            limit -= 2 * going; // muita gente indo = mais concorrência
+            // Correr sai mais barato do que ir e perder; o difícil considera isso.
+            return score <= limit;
+        }
+
+        public TurnDecision? ChooseAtravessar(PlayerView v)
+        {
+            if (!v.CanAtravessar || !v.DiscardTop.HasValue) return null;
+            var top = v.DiscardTop.Value;
+            var withTop = new List<Card>(v.Hand) { top };
+            var found = FindBater(withTop, v, top);
+            if (!found.HasValue) return null;
+            // O fácil às vezes nem percebe.
+            if (_difficulty == BotDifficulty.Facil && _rng.Next(100) < 50) return null;
+            return found;
         }
 
         public DrawSource ChooseDraw(PlayerView v)
@@ -126,6 +166,8 @@ namespace Cacheta.Core.Bots
             TurnDecision? found = null;
             bool foundClean = false;
 
+            if (v.Rules.BatidaDeDez && HandEvaluator.BatidaDeDez(hand, v.Rules, v.Jokers) != null)
+                return new TurnDecision(true, null); // batida de 10 sempre vale mais
             if (v.Rules.BaterMode != BaterMode.DescartandoNove)
             {
                 var arr = HandEvaluator.Arrange(hand, v.Rules, v.Jokers);
@@ -193,6 +235,8 @@ namespace Cacheta.Core.Bots
             int seat = match.CurrentSeat;
             if (seat < 0) return ActionResult.Fail("Ninguém está na vez");
             var view = match.GetView(seat);
+            if (match.Phase == TurnPhase.Decidir)
+                return match.Decide(seat, bot.ChooseVai(view));
             if (match.Phase == TurnPhase.Comprar)
             {
                 var source = bot.ChooseDraw(view);
@@ -213,6 +257,27 @@ namespace Cacheta.Core.Bots
             return ActionResult.Fail("Fase sem ação de jogador");
         }
 
+        /// <summary>
+        /// Depois de um descarte, dá a chance de cada bot (na ordem da mesa a partir de quem descartou) bater
+        /// atravessando. <paramref name="isBot"/> diz quais assentos são bots. Devolve true se alguém tentou.
+        /// </summary>
+        public static bool TryAtravessar(CachetaMatch match, IReadOnlyList<IBot> bots, Func<int, bool> isBot = null)
+        {
+            int from = match.AtravessarFrom;
+            if (from < 0) return false;
+            for (int i = 1; i < match.PlayerCount; i++)
+            {
+                int seat = (from + i) % match.PlayerCount;
+                if (isBot != null && !isBot(seat)) continue;
+                if (bots[seat] == null || !match.CanAtravessar(seat)) continue;
+                var d = bots[seat].ChooseAtravessar(match.GetView(seat));
+                if (!d.HasValue) continue;
+                match.BaterAtravessando(seat, d.Value.Discard);
+                return true;
+            }
+            return false;
+        }
+
         /// <summary>Joga uma partida inteira só com bots. Devolve o assento vencedor.</summary>
         public static int? PlayWholeMatch(CachetaMatch match, IReadOnlyList<IBot> bots, int maxActions = 200000)
         {
@@ -224,6 +289,7 @@ namespace Cacheta.Core.Bots
                     match.StartNextRound();
                     continue;
                 }
+                if (match.Phase == TurnPhase.Comprar && TryAtravessar(match, bots) && match.Phase != TurnPhase.Comprar) continue;
                 var r = Step(match, bots[match.CurrentSeat]);
                 if (!r.Ok) throw new InvalidOperationException("Bot fez jogada inválida: " + r.Error);
             }
