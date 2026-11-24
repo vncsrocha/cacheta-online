@@ -113,7 +113,9 @@ namespace Cacheta.App
             var rng = new System.Random();
             _profiles = new List<PlayerProfile> { app.Profile.Clone() };
             var botNames = BotNames.OrderBy(_ => rng.Next()).ToList();
-            for (int i = 0; i < room.Bots; i++) _profiles.Add(PlayerProfile.Random(botNames[i % botNames.Count], rng));
+            // O Tio Beto (primeiro personagem desenhado) sempre senta na mesa, de frente para você quando possível
+            for (int i = 0; i < room.Bots; i++)
+                _profiles.Add(i == room.Bots / 2 ? PlayerProfile.TioBeto() : PlayerProfile.Random(botNames[i % botNames.Count], rng));
 
             _match = new CachetaMatch(_profiles.Select(p => p.Name).ToList(), room.BuildRules(), (ulong)System.DateTime.Now.Ticks);
             _bots = Enumerable.Range(0, players)

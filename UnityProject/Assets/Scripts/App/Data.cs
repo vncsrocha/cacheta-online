@@ -24,6 +24,10 @@ namespace Cacheta.App
     public enum Gender { Masculino, Feminino, Neutro }
     public enum HairStyle { Careca, Curto, BlackPower, Comprido, Moicano, Coque }
     public enum HatStyle { Nenhum, Bone, Panama, Touca }
+    public enum BodyType { Magro, Medio, Barrigudo }
+    public enum ShirtPattern { Lisa, Listrada }
+    public enum Bottoms { Bermuda, Calca }
+    public enum Shoes { Chinelo, Tenis }
 
     /// <summary>Perfil do jogador: nome e aparência do personagem. Salvo localmente (depois, na conta online).</summary>
     [Serializable]
@@ -39,6 +43,12 @@ namespace Cacheta.App
         public HatStyle Hat = HatStyle.Nenhum;
         public bool Glasses;
         public bool Mustache;
+        public BodyType Body = BodyType.Medio;
+        public ShirtPattern Pattern = ShirtPattern.Lisa;
+        public int ShirtColor2 = 1;
+        public Bottoms Bottom = Bottoms.Bermuda;
+        public Shoes Shoes = Shoes.Chinelo;
+        public bool Chain;
 
         public PlayerProfile Clone() => (PlayerProfile)MemberwiseClone();
 
@@ -57,8 +67,22 @@ namespace Cacheta.App
                 Hat = (HatStyle)rng.Next(Enum.GetValues(typeof(HatStyle)).Length),
                 Glasses = rng.Next(4) == 0,
                 Mustache = rng.Next(4) == 0,
+                Body = (BodyType)rng.Next(3),
+                Pattern = (ShirtPattern)rng.Next(2),
+                ShirtColor2 = rng.Next(Palette.ClothColors.Length),
+                Bottom = (Bottoms)rng.Next(2),
+                Shoes = (Shoes)rng.Next(2),
+                Chain = rng.Next(3) == 0,
             };
         }
+
+        /// <summary>O Tio Beto, primeiro personagem desenhado (proporção "meio-termo").</summary>
+        public static PlayerProfile TioBeto() => new PlayerProfile
+        {
+            Name = "Tio Beto", Gender = Gender.Masculino, SkinTone = 3, Hair = HairStyle.Curto, HairColor = 0,
+            ShirtColor = 0, ShirtColor2 = 10, Pattern = ShirtPattern.Listrada, PantsColor = 9, Bottom = Bottoms.Bermuda,
+            Shoes = Shoes.Chinelo, Body = BodyType.Barrigudo, Mustache = true, Chain = true,
+        };
     }
 
     /// <summary>Opções do jogo (menu Opções).</summary>
@@ -131,6 +155,10 @@ namespace Cacheta.App
                 default: return h.ToString();
             }
         }
+
+        public static string Of(BodyType b) => b == BodyType.Medio ? "Médio" : b.ToString();
+        public static string Of(Bottoms b) => b == Bottoms.Calca ? "Calça" : "Bermuda";
+        public static string Of(Shoes s) => s == Shoes.Tenis ? "Tênis" : "Chinelo";
 
         public static string Of(HatStyle h)
         {

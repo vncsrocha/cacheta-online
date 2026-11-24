@@ -78,10 +78,10 @@ namespace Cacheta.App
 
         public void Draw()
         {
-            float w = 760, x = UiKit.W - w - 70, y = 70, row = 58, gap = 14;
-            UiKit.Panel(new Rect(x - 30, y - 30, w + 60, UiKit.H - 80), 0.6f);
+            float w = 760, x = UiKit.W - w - 70, y = 50, row = 46, gap = 8;
+            UiKit.Panel(new Rect(x - 30, y - 25, w + 60, UiKit.H - 50), 0.6f);
             GUI.Label(new Rect(x, y, w, 60), SaveSystem.HasProfile ? "Seu personagem" : "Crie o seu personagem", UiKit.Subtitle);
-            y += 80;
+            y += 70;
 
             var before = JsonUtility.ToJson(_edit);
 
@@ -90,39 +90,60 @@ namespace Cacheta.App
             y += row + gap;
             _edit.Gender = UiKit.Selector(new Rect(x, y, w, row), "Gênero", _edit.Gender, g => g.ToString());
             y += row + gap;
+            _edit.Body = UiKit.Selector(new Rect(x, y, w, row), "Corpo", _edit.Body, Names.Of);
+            y += row + gap;
             _edit.SkinTone = UiKit.Swatches(new Rect(x, y, w, row), "Tom de pele", _edit.SkinTone, Palette.SkinTones);
             y += row + gap;
             _edit.Hair = UiKit.Selector(new Rect(x, y, w, row), "Cabelo", _edit.Hair, Names.Of);
             y += row + gap;
             _edit.HairColor = UiKit.Swatches(new Rect(x, y, w, row), "Cor do cabelo", _edit.HairColor, Palette.HairColors);
             y += row + gap;
-            _edit.ShirtColor = UiKit.Swatches(new Rect(x, y, w, row), "Camisa", _edit.ShirtColor, Palette.ClothColors);
+            _edit.Pattern = UiKit.Selector(new Rect(x, y, w, row), "Camisa", _edit.Pattern, pt => pt.ToString());
             y += row + gap;
-            _edit.PantsColor = UiKit.Swatches(new Rect(x, y, w, row), "Calça", _edit.PantsColor, Palette.ClothColors);
+            _edit.ShirtColor = UiKit.Swatches(new Rect(x, y, w, row), "Cor da camisa", _edit.ShirtColor, Palette.ClothColors);
+            y += row + gap;
+            if (_edit.Pattern == ShirtPattern.Listrada)
+            {
+                _edit.ShirtColor2 = UiKit.Swatches(new Rect(x, y, w, row), "Cor da listra", _edit.ShirtColor2, Palette.ClothColors);
+                y += row + gap;
+            }
+            _edit.Bottom = UiKit.Selector(new Rect(x, y, w, row), "Parte de baixo", _edit.Bottom, Names.Of);
+            y += row + gap;
+            _edit.PantsColor = UiKit.Swatches(new Rect(x, y, w, row), "Cor de " + Names.Of(_edit.Bottom).ToLower(), _edit.PantsColor, Palette.ClothColors);
+            y += row + gap;
+            _edit.Shoes = UiKit.Selector(new Rect(x, y, w, row), "Nos pés", _edit.Shoes, Names.Of);
             y += row + gap;
             _edit.Hat = UiKit.Selector(new Rect(x, y, w, row), "Chapéu", _edit.Hat, Names.Of);
             y += row + gap;
-            _edit.Glasses = UiKit.Toggle(new Rect(x, y, w, row), "Óculos", _edit.Glasses);
-            y += row + gap;
-            _edit.Mustache = UiKit.Toggle(new Rect(x, y, w, row), "Bigode", _edit.Mustache);
-            y += row + gap * 2;
+            float tw = w / 3f;
+            _edit.Glasses = SmallToggle(new Rect(x, y, tw - 10, row), "Óculos", _edit.Glasses);
+            _edit.Mustache = SmallToggle(new Rect(x + tw, y, tw - 10, row), "Bigode", _edit.Mustache);
+            _edit.Chain = SmallToggle(new Rect(x + tw * 2, y, tw - 10, row), "Corrente", _edit.Chain);
+            y += row + gap * 3;
 
             if (JsonUtility.ToJson(_edit) != before) _app.Stage.SetAvatar(_edit); // pré-visualização ao vivo
 
-            if (GUI.Button(new Rect(x, y, 230, 70), "Aleatório", UiKit.Button))
+            if (GUI.Button(new Rect(x, y, 230, 64), "Aleatório", UiKit.Button))
             {
                 var name = _edit.Name;
                 _edit = PlayerProfile.Random(name, new System.Random());
                 _app.Stage.SetAvatar(_edit);
             }
-            if (GUI.Button(new Rect(x + w - 470, y, 220, 70), "Cancelar", UiKit.Button)) _app.Go(ScreenId.MainMenu);
-            if (GUI.Button(new Rect(x + w - 230, y, 230, 70), "Salvar", UiKit.Selected))
+            if (GUI.Button(new Rect(x + w - 470, y, 220, 64), "Cancelar", UiKit.Button)) _app.Go(ScreenId.MainMenu);
+            if (GUI.Button(new Rect(x + w - 230, y, 230, 64), "Salvar", UiKit.Selected))
             {
                 if (string.IsNullOrWhiteSpace(_edit.Name)) { _app.Toast("Escolha um nome"); return; }
                 _edit.Name = _edit.Name.Trim();
                 _app.SaveProfile(_edit);
                 _app.Go(ScreenId.MainMenu);
             }
+        }
+
+        /// <summary>Botão liga/desliga compacto (vários por linha).</summary>
+        private static bool SmallToggle(Rect r, string label, bool value)
+        {
+            if (GUI.Button(r, (value ? "[x] " : "[  ] ") + label, value ? UiKit.Selected : UiKit.Button)) value = !value;
+            return value;
         }
     }
 
