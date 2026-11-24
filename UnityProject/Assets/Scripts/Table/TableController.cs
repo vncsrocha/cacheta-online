@@ -122,8 +122,11 @@ namespace Cacheta.App
                 _profiles.Add(i == room.Bots / 2 ? PlayerProfile.TioBeto() : PlayerProfile.Random(botNames[i % botNames.Count], rng));
 
             _match = new CachetaMatch(_profiles.Select(p => p.Name).ToList(), room.BuildRules(), (ulong)System.DateTime.Now.Ticks);
+            // Cada bot tem um jeito de jogar: personagens fixos têm o seu, os outros sorteiam (corajoso, conservador...).
+            var styleRng = new Rng((ulong)System.DateTime.Now.Ticks);
             _bots = Enumerable.Range(0, players)
-                .Select(i => (IBot)new SimpleBot(room.Difficulty, (ulong)(System.DateTime.Now.Ticks + i * 7919))).ToList();
+                .Select(i => (IBot)new SimpleBot(room.Difficulty, (ulong)(System.DateTime.Now.Ticks + i * 7919),
+                                                 BotPersonality.ForCharacter(_profiles[i].Name, styleRng))).ToList();
             _match.EventRaised += OnEvent;
 
             var look = EnvironmentBuilder.Build(room.Environment, _world, _cam);
@@ -829,13 +832,14 @@ namespace Cacheta.App
                 var sp = _cam.WorldToScreenPoint(world);
                 if (sp.z < 0) continue;
                 float x = sp.x / UiKit.Scale, y = (Screen.height - sp.y) / UiKit.Scale;
-                var r = new Rect(x - 130, y - 70, 260, 70);
+                var r = new Rect(x - 170, y - 70, 340, 70);
                 bool turn = _match.CurrentSeat == s && _match.Phase != TurnPhase.FimDaRodada;
                 bool out_ = _match.IsEliminated(s);
                 UiKit.Box(r, turn ? new Color(1f, 0.78f, 0.1f, 0.9f) : new Color(0, 0, 0, out_ ? 0.3f : 0.6f));
                 var txt = turn ? Color.black : Color.white;
                 UiKit.Label(new Rect(r.x + 10, r.y + 4, r.width - 20, 30),
-                    _match.PlayerNames[s] + (_match.DealerSeat == s ? "  (D)" : ""), UiKit.Small, txt);
+                    _match.PlayerNames[s] + (_match.DealerSeat == s ? "  (D)" : "")
+                    + (_bots[s] is SimpleBot sb ? $"  ·  {sb.Personality.Estilo.ToLower()}" : ""), UiKit.Small, txt);
                 UiKit.Label(new Rect(r.x + 10, r.y + 34, r.width - 20, 30),
                     out_ ? "fora da mesa" : $"{_match.GetTentos(s)} tentos  ·  {StatusText(s)}", UiKit.Tiny, txt);
             }

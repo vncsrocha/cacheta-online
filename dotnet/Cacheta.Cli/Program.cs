@@ -58,6 +58,33 @@ static void Simulate(int matches, ulong seed)
     Console.WriteLine($"Batidas limpas: {100.0 * clean / Math.Max(1, bateu):F0}%   rodadas anuladas: {annulled}");
     Console.WriteLine($"Vai: {100.0 * vai / Math.Max(1, decisoes):F0}% das decisões   rodadas sem disputa: {semDisputa} de {semDisputa + bateu + annulled}");
     Console.WriteLine($"Batidas atravessando: {atravessou}   batidas de 10: {dez}   bater furado: {furado}");
+    SimulateStyles(matches, seed);
+}
+
+// Mesma dificuldade (médio), estilos diferentes, trocando de lugar a cada partida.
+static void SimulateStyles(int matches, ulong seed)
+{
+    Func<BotPersonality>[] styles = { BotPersonality.Medroso, BotPersonality.Conservador, BotPersonality.Equilibrado,
+                                      BotPersonality.Corajoso, BotPersonality.Kamikaze, BotPersonality.Equilibrado };
+    var wins = new Dictionary<string, int>();
+    var vai = new Dictionary<string, (int vai, int total)>();
+    for (int g = 0; g < matches; g++)
+    {
+        var names = Enumerable.Range(0, 6).Select(i => $"Bot{i}").ToList();
+        var m = new CachetaMatch(names, RuleSet.Default(), seed + 999 + (ulong)g, firstDealer: g % 6);
+        var bots = Enumerable.Range(0, 6).Select(i => new SimpleBot(BotDifficulty.Medio, seed * 17 + (ulong)(g * 7 + i), styles[(i + g) % 6]())).ToList();
+        int? w = BotDriver.PlayWholeMatch(m, bots.Cast<IBot>().ToList());
+        if (w.HasValue) { var st = bots[w.Value].Personality.Estilo; wins[st] = wins.GetValueOrDefault(st) + 1; }
+        foreach (var e in m.Log.Where(e => e.Type == GameEventType.Decidiu))
+        {
+            var st = bots[e.Seat].Personality.Estilo;
+            var cur = vai.GetValueOrDefault(st);
+            vai[st] = (cur.vai + e.Amount, cur.total + 1);
+        }
+    }
+    Console.WriteLine("Estilos (todos no médio; Equilibrado ocupa 2 lugares):");
+    foreach (var st in vai.Keys.OrderBy(k => 100.0 * vai[k].vai / vai[k].total))
+        Console.WriteLine($"  {st,-12} vai em {100.0 * vai[st].vai / vai[st].total,3:F0}% das mãos   vitórias: {wins.GetValueOrDefault(st)}");
 }
 
 static void PlayInteractive(int botCount, ulong seed)

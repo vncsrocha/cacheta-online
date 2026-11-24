@@ -104,3 +104,8 @@ Curinga usado no próprio lugar (ex.: 3♣ curinga em 2♣ 3♣ 4♣) conta como
 `SimpleBot` olha só a `PlayerView` (não vê a mão dos outros). Mede a mão por cartas soltas e "quase-jogos",
 pega o descarte quando melhora de verdade e descarta a carta que menos faz falta. Fácil erra ~30% dos descartes
 e quase nunca pega do descarte; médio erra ~8%; difícil não erra.
+
+Além da dificuldade, cada bot tem um estilo (`BotPersonality`): Medroso, Conservador, Equilibrado, Corajoso
+ou Kamikaze. O estilo muda o quanto ele arrisca no vai ou corre e o quanto ele percebe a chance de bater
+atravessando. Os personagens fixos têm estilo próprio (Tio Beto corajoso, Dona Cleide conservadora,
+Marquinho kamikaze, Ana calculista, Marcela conservadora, Ramiro corajoso, Little Tiger viciado).

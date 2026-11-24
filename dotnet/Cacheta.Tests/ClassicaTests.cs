@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Cacheta.Core;
+using Cacheta.Core.Bots;
 using Xunit;
 using static Cacheta.Tests.HandEvaluatorTests;
 
@@ -210,6 +211,21 @@ namespace Cacheta.Tests
             Assert.Equal(SeatStatus.Sentado, m.GetStatus(0));
             Assert.Empty(m.GetHand(0));
             Assert.NotEqual(0, m.CurrentSeat);
+        }
+
+        [Fact]
+        public void BotCorajosoVaiMaisQueOMedroso()
+        {
+            int corajoso = 0, medroso = 0;
+            for (ulong seed = 1; seed <= 200; seed++)
+            {
+                var m = NewMatch(4, seed);
+                m.StartNextRound();
+                var v = m.GetView(m.CurrentSeat);
+                if (new SimpleBot(BotDifficulty.Dificil, seed, BotPersonality.Kamikaze()).ChooseVai(v)) corajoso++;
+                if (new SimpleBot(BotDifficulty.Dificil, seed, BotPersonality.Medroso()).ChooseVai(v)) medroso++;
+            }
+            Assert.True(corajoso > medroso * 2, $"kamikaze {corajoso}, medroso {medroso}");
         }
 
         [Fact]
