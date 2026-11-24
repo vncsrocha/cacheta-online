@@ -11,3 +11,9 @@ TestResults/
 [Uu]ser[Ss]ettings/
 [Bb]uild/
 [Bb]uilds/
+UnityProject/[Ll]ibrary/
+UnityProject/[Tt]emp/
+UnityProject/[Oo]bj/
+UnityProject/[Ll]ogs/
+UnityProject/*.csproj
+UnityProject/*.sln
