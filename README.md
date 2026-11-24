@@ -13,7 +13,11 @@ unity-package/com.vncsrocha.cacheta.core/   pacote Unity (o código de verdade f
   Runtime/Game/       CachetaMatch (partida, rodadas, tentos), GameEvent, PlayerView
   Runtime/Bots/       SimpleBot (fácil/médio/difícil), BotDriver
   Samples~/MesaLocal/ exemplo de MonoBehaviour usando o motor
-UnityProject/                              projeto Unity com a mesa de teste (Assets/Scripts/MesaCacheta.cs)
+UnityProject/Assets/Scripts/               o jogo no Unity (arte provisória, tudo montado por código)
+  App/        GameApp (entrada, troca de telas), dados do perfil/opções/sala, palco 3D do menu
+  UI/         kit de interface provisório (IMGUI) e telas: menu, perfil, opções, criar/entrar em sala
+  Visual/     personagens, ambientes e cartas provisórios (primitivos e texturas geradas)
+  Table/      TableController: mesa 3D, câmera, arrastar cartas, bots e HUD
 dotnet/                                    projetos .NET que compilam o mesmo código fora do Unity
   Cacheta.Core/       biblioteca netstandard2.1 / C# 9 (mesmas restrições do Unity)
   Cacheta.Tests/      testes xUnit
@@ -32,20 +36,30 @@ dotnet run --project Cacheta.Cli -- --bots 5        # você contra 5 bots
 dotnet run --project Cacheta.Cli -- --sim 100       # 100 partidas de 6 bots, com estatísticas
 ```
 
-## Testando no Unity (mesa de teste)
+## Testando no Unity
 
 A pasta `UnityProject/` é um projeto Unity pronto, que já aponta para o pacote do motor.
 
-1. Instale o [Unity Hub](https://unity.com/download) e uma versão **Unity 6 LTS** (6000.x). 2022.3 LTS também serve.
+1. Instale o [Unity Hub](https://unity.com/download) e uma versão **Unity 6 LTS** (6000.x).
 2. No Hub: **Add > Add project from disk** e escolha a pasta `UnityProject`.
-   Se o Hub disser que a versão do projeto não está instalada, escolha a sua versão 6000.x e confirme.
-3. A primeira abertura demora alguns minutos (o Unity monta a pasta Library).
-4. Aperte **Play**. Não precisa montar cena: a mesa é criada sozinha em qualquer cena.
+3. Aperte **Play** em qualquer cena: o jogo se monta sozinho (não há cenas nem prefabs ainda).
 
-Na mesa: escolha número de bots e dificuldade, clique no **monte** ou no **descarte** para comprar,
-clique numa carta da mão para selecioná-la e use **Descartar** ou **Bater**. Com "dicas" ligadas, as cartas
-que já estão em jogo ficam com borda verde e o botão Bater acende quando dá para bater.
-Curingas têm borda dourada e uma estrela. A arte é provisória (desenhada por código) e vai ser trocada.
+O que existe (tudo funcional, com arte provisória):
+
+- **Menu inicial**: nome do jogo e seu personagem à esquerda; à direita Jogar Cacheta, Jogar Cachetex,
+  Entrar em uma sala, Personalizar perfil, Opções e Sair. Na primeira vez abre direto a criação do personagem.
+- **Perfil**: nome, gênero, tom de pele, cabelo e cor, camisa, calça, chapéu, óculos e bigode, com pré-visualização.
+- **Opções**: volume (geral, música, efeitos), resolução, tela cheia, qualidade, VSync, velocidade dos bots,
+  dicas e confirmação antes de bater. Tudo salvo.
+- **Criar sala**: modo, ambiente (Quintal ao entardecer, Boteco, Quiosque na praia), número de bots e dificuldade.
+  A sala online e o "Entrar em uma sala" já têm a tela, mas só funcionam quando o multiplayer existir.
+- **Mesa 3D**: vista sentado à mesa com os adversários em volta; zoom na mão (botão direito, roda do mouse,
+  Espaço ou botão "Ver minha mão"); **arraste as cartas** para reorganizar a mão e solte no descarte para
+  descartar; clique no monte ou no descarte para comprar; HUD fixa no canto com a mesa vista de cima
+  (vira, monte, descarte, tentos e o que aconteceu); Esc pausa.
+
+O Cachetex ainda não tem regras próprias: por enquanto é a Cacheta sem limite de curingas por jogo
+(`RoomConfig.BuildRules`).
 
 Para usar o motor em outro projeto Unity: **Window > Package Manager > + > Add package from disk...** e escolha
 `unity-package/com.vncsrocha.cacheta.core/package.json`.
