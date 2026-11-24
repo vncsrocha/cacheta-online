@@ -20,7 +20,7 @@ namespace Cacheta.App
         private const float CardW = 0.12f, CardH = 0.18f;
         private const float HandSpacing = 0.1f;
 
-        private static readonly string[] BotNames = { "Zé do Bar", "Dona Cida", "Tonhão", "Marquinho", "Seu Juca", "Neide", "Baiano" };
+        private static readonly string[] BotNames = { "Zé do Bar", "Dona Cida", "Tonhão", "Seu Juca", "Neide", "Baiano", "Rosinha" };
 
         // Câmera: vista geral (sentado à mesa) e zoom (olhando para a mão e o centro da mesa).
         private static readonly Vector3 OverviewPos = new Vector3(0, 1.5f, -1.95f);
@@ -117,9 +117,16 @@ namespace Cacheta.App
             var rng = new System.Random();
             _profiles = new List<PlayerProfile> { app.Profile.Clone() };
             var botNames = BotNames.OrderBy(_ => rng.Next()).ToList();
-            // O Tio Beto (primeiro personagem desenhado) sempre senta na mesa, de frente para você quando possível
+            // Os lugares são ocupados pelos personagens do jogo (sorteados); o Tio Beto senta de frente para você.
+            // Se a mesa tiver mais lugares que personagens, completa com bots genéricos.
+            var chefes = PlayerProfile.Chefes().Skip(1).OrderBy(_ => rng.Next()).ToList();
+            int extra = 0;
             for (int i = 0; i < room.Bots; i++)
-                _profiles.Add(i == room.Bots / 2 ? PlayerProfile.TioBeto() : PlayerProfile.Random(botNames[i % botNames.Count], rng));
+            {
+                if (i == room.Bots / 2) _profiles.Add(PlayerProfile.TioBeto());
+                else if (chefes.Count > 0) { _profiles.Add(chefes[0]); chefes.RemoveAt(0); }
+                else _profiles.Add(PlayerProfile.Random(botNames[extra++ % botNames.Count], rng));
+            }
 
             _match = new CachetaMatch(_profiles.Select(p => p.Name).ToList(), room.BuildRules(), (ulong)System.DateTime.Now.Ticks);
             // Cada bot tem um jeito de jogar: personagens fixos têm o seu, os outros sorteiam (corajoso, conservador...).

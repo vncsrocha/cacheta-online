@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using Cacheta.Core;
 using Cacheta.Core.Bots;
@@ -85,6 +86,57 @@ namespace Cacheta.App
             ShirtColor = 0, ShirtColor2 = 10, Pattern = ShirtPattern.Listrada, PantsColor = 9, Bottom = Bottoms.Bermuda,
             Shoes = Shoes.Chinelo, Body = BodyType.Barrigudo, Mustache = true, Chain = true,
             Model = "TioBeto",
+        };
+
+        // Os outros chefes do Rei do Carteado. Também jogam como bots comuns (sem o poder de chefe).
+        // Se o .glb ainda não estiver em Resources/Personagens, o avatar é montado com as formas simples.
+        public static PlayerProfile DonaCleide() => new PlayerProfile
+        {
+            Name = "Dona Cleide", Gender = Gender.Feminino, SkinTone = 2, Hair = HairStyle.Curto, HairColor = 4,
+            ShirtColor = 2, Bottom = Bottoms.Calca, PantsColor = 2, Shoes = Shoes.Tenis, Body = BodyType.Barrigudo, Glasses = true,
+            Model = "DonaCleide",
+        };
+
+        public static PlayerProfile Marquinho() => new PlayerProfile
+        {
+            Name = "Marquinho", Gender = Gender.Masculino, SkinTone = 4, Hair = HairStyle.Curto, HairColor = 3,
+            ShirtColor = 3, PantsColor = 6, Bottom = Bottoms.Bermuda, Shoes = Shoes.Chinelo, Body = BodyType.Magro, Chain = true,
+            Model = "Marquinho",
+        };
+
+        public static PlayerProfile Ana() => new PlayerProfile
+        {
+            Name = "Ana", Gender = Gender.Feminino, SkinTone = 0, Hair = HairStyle.Comprido, HairColor = 7,
+            ShirtColor = 10, PantsColor = 3, Bottom = Bottoms.Calca, Shoes = Shoes.Tenis, Body = BodyType.Magro, Glasses = true,
+            Model = "Ana",
+        };
+
+        public static PlayerProfile Marcela() => new PlayerProfile
+        {
+            Name = "Marcela", Gender = Gender.Feminino, SkinTone = 4, Hair = HairStyle.BlackPower, HairColor = 0,
+            ShirtColor = 3, PantsColor = 3, Bottom = Bottoms.Bermuda, Shoes = Shoes.Tenis, Body = BodyType.Magro,
+            Model = "Marcela",
+        };
+
+        public static PlayerProfile Ramiro() => new PlayerProfile
+        {
+            Name = "Ramiro", Gender = Gender.Masculino, SkinTone = 5, Hair = HairStyle.Careca, ShirtColor = 2,
+            PantsColor = 9, Bottom = Bottoms.Bermuda, Shoes = Shoes.Chinelo, Body = BodyType.Barrigudo, Mustache = true,
+            Model = "Ramiro",
+        };
+
+        /// <summary>Chefe final. Até a fase dele aparece de terno preto; na final se revela (modelo LittleTigerRevelado).</summary>
+        public static PlayerProfile LittleTiger(bool revelado = false) => new PlayerProfile
+        {
+            Name = "Little Tiger", Gender = Gender.Masculino, SkinTone = 3, Hair = HairStyle.Curto, HairColor = 0,
+            ShirtColor = revelado ? 6 : 5, PantsColor = 5, Bottom = Bottoms.Calca, Shoes = Shoes.Tenis, Body = BodyType.Magro, Chain = true,
+            Model = revelado ? "LittleTigerRevelado" : "LittleTiger",
+        };
+
+        /// <summary>Todos os chefes, na ordem sugerida do Rei do Carteado (o Little Tiger aparece disfarçado).</summary>
+        public static List<PlayerProfile> Chefes() => new List<PlayerProfile>
+        {
+            TioBeto(), DonaCleide(), Marcela(), Ramiro(), Marquinho(), Ana(), LittleTiger(),
         };
     }
 
