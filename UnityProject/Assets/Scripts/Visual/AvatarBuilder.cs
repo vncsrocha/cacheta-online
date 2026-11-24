@@ -23,6 +23,7 @@ namespace Cacheta.App
         public static void Rebuild(GameObject root, PlayerProfile p, bool seated)
         {
             for (int i = root.transform.childCount - 1; i >= 0; i--) Object.Destroy(root.transform.GetChild(i).gameObject);
+            if (ModelAvatar.TryBuild(root.transform, p.Model, seated)) return; // modelo 3D pronto, se existir
             new Builder(root.transform, p, seated).Build();
         }
 

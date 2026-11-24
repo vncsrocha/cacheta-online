@@ -49,6 +49,8 @@ namespace Cacheta.App
         public Bottoms Bottom = Bottoms.Bermuda;
         public Shoes Shoes = Shoes.Chinelo;
         public bool Chain;
+        /// <summary>Modelo 3D pronto em Resources/Personagens (vazio = monta com formas simples).</summary>
+        public string Model = "";
 
         public PlayerProfile Clone() => (PlayerProfile)MemberwiseClone();
 
@@ -82,6 +84,7 @@ namespace Cacheta.App
             Name = "Tio Beto", Gender = Gender.Masculino, SkinTone = 3, Hair = HairStyle.Curto, HairColor = 0,
             ShirtColor = 0, ShirtColor2 = 10, Pattern = ShirtPattern.Listrada, PantsColor = 9, Bottom = Bottoms.Bermuda,
             Shoes = Shoes.Chinelo, Body = BodyType.Barrigudo, Mustache = true, Chain = true,
+            Model = "TioBeto",
         };
     }
 
