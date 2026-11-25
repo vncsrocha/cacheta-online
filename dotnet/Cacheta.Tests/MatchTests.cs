@@ -10,7 +10,19 @@ namespace Cacheta.Tests
     public class MatchTests
     {
         private static CachetaMatch NewMatch(int players = 3, RuleSet rules = null, ulong seed = 42)
-            => new CachetaMatch(Enumerable.Range(0, players).Select(i => "P" + i).ToList(), rules, seed);
+            => new CachetaMatch(Enumerable.Range(0, players).Select(i => "P" + i).ToList(), rules ?? Antiga(), seed);
+
+        /// <summary>Regras da primeira versão (sem vai ou corre), para os testes do motor básico.</summary>
+        private static RuleSet Antiga()
+        {
+            var r = RuleSet.Default();
+            r.MinPlayers = 2;
+            r.VaiOuCorre = false;
+            r.CleanBaterDoubles = true;
+            r.BatidaDeDez = false;
+            r.BaterAtravessando = false;
+            return r;
+        }
 
         [Fact]
         public void DistribuiNoveCartasEViraCuringa()
@@ -112,7 +124,7 @@ namespace Cacheta.Tests
         [Fact]
         public void ModoBaixandoDez()
         {
-            var rules = RuleSet.Default();
+            var rules = Antiga();
             rules.BaterMode = BaterMode.BaixandoDez;
             var m = NewMatch(2, rules);
             m.StartNextRound();
@@ -147,7 +159,7 @@ namespace Cacheta.Tests
         [Fact]
         public void MonteAcabaRodadaAnulada()
         {
-            var rules = RuleSet.Default();
+            var rules = Antiga();
             rules.EmptyStock = EmptyStockRule.RodadaAnulada;
             var m = NewMatch(2, rules);
             m.StartNextRound();
@@ -172,7 +184,7 @@ namespace Cacheta.Tests
         }
 
         [Theory]
-        [InlineData(2)]
+        [InlineData(3)]
         [InlineData(4)]
         [InlineData(6)]
         [InlineData(8)]
@@ -193,7 +205,7 @@ namespace Cacheta.Tests
         [Fact]
         public void TentosAcabamEJogadorEliminadoSaiDaRoda()
         {
-            var rules = RuleSet.Default();
+            var rules = Antiga();
             rules.StartingTentos = 1;
             rules.CleanBaterDoubles = false;
             var m = NewMatch(3, rules);

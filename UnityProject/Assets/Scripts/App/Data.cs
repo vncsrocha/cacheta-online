@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using Cacheta.Core;
 using Cacheta.Core.Bots;
@@ -13,12 +14,19 @@ namespace Cacheta.App
         Cachetex,
     }
 
-    /// <summary>Ambientes onde a partida acontece. Quem cria a sala escolhe.</summary>
+    /// <summary>
+    /// Ambientes onde a partida acontece: um cenário para cada chefe do Rei do Carteado. Na Cacheta Clássica quem cria a
+    /// sala escolhe qualquer um.
+    /// </summary>
     public enum EnvironmentId
     {
-        QuintalAoEntardecer,
-        Boteco,
-        Quiosque,
+        BarDoTioBeto,
+        SalaoDeBingo,
+        GaragemDaMarcela,
+        QuintalDoRamiro,
+        QuiosqueDoMarquinho,
+        PatioDaUniversidade,
+        SalaVip,
     }
 
     public enum Gender { Masculino, Feminino, Neutro }
@@ -51,6 +59,8 @@ namespace Cacheta.App
         public bool Chain;
         /// <summary>Modelo 3D pronto em Resources/Personagens (vazio = monta com formas simples).</summary>
         public string Model = "";
+        /// <summary>Altura da pessoa em metros (1,75 = altura padrão). Só vale para os modelos 3D.</summary>
+        public float Height = 1.75f;
 
         public PlayerProfile Clone() => (PlayerProfile)MemberwiseClone();
 
@@ -84,8 +94,68 @@ namespace Cacheta.App
             Name = "Tio Beto", Gender = Gender.Masculino, SkinTone = 3, Hair = HairStyle.Curto, HairColor = 0,
             ShirtColor = 0, ShirtColor2 = 10, Pattern = ShirtPattern.Listrada, PantsColor = 9, Bottom = Bottoms.Bermuda,
             Shoes = Shoes.Chinelo, Body = BodyType.Barrigudo, Mustache = true, Chain = true,
-            Model = "TioBeto",
+            Model = "TioBeto", Height = 1.70f,
         };
+
+        // Os outros chefes do Rei do Carteado. Também jogam como bots comuns (sem o poder de chefe).
+        // Se o .glb ainda não estiver em Resources/Personagens, o avatar é montado com as formas simples.
+        public static PlayerProfile DonaCleide() => new PlayerProfile
+        {
+            Name = "Dona Cleide", Gender = Gender.Feminino, SkinTone = 2, Hair = HairStyle.Curto, HairColor = 4,
+            ShirtColor = 2, Bottom = Bottoms.Calca, PantsColor = 2, Shoes = Shoes.Tenis, Body = BodyType.Barrigudo, Glasses = true,
+            Model = "DonaCleide", Height = 1.60f,
+        };
+
+        public static PlayerProfile Marquinho() => new PlayerProfile
+        {
+            Name = "Marquinho", Gender = Gender.Masculino, SkinTone = 4, Hair = HairStyle.Curto, HairColor = 3,
+            ShirtColor = 3, PantsColor = 6, Bottom = Bottoms.Bermuda, Shoes = Shoes.Chinelo, Body = BodyType.Magro, Chain = true,
+            Model = "Marquinho", Height = 1.75f,
+        };
+
+        public static PlayerProfile Ana() => new PlayerProfile
+        {
+            Name = "Ana", Gender = Gender.Feminino, SkinTone = 0, Hair = HairStyle.Comprido, HairColor = 7,
+            ShirtColor = 10, PantsColor = 3, Bottom = Bottoms.Calca, Shoes = Shoes.Tenis, Body = BodyType.Magro, Glasses = true,
+            Model = "Ana", Height = 1.58f,
+        };
+
+        public static PlayerProfile Marcela() => new PlayerProfile
+        {
+            Name = "Marcela", Gender = Gender.Feminino, SkinTone = 4, Hair = HairStyle.BlackPower, HairColor = 0,
+            ShirtColor = 3, PantsColor = 3, Bottom = Bottoms.Bermuda, Shoes = Shoes.Tenis, Body = BodyType.Magro,
+            Model = "Marcela", Height = 1.65f,
+        };
+
+        public static PlayerProfile Ramiro() => new PlayerProfile
+        {
+            Name = "Ramiro", Gender = Gender.Masculino, SkinTone = 5, Hair = HairStyle.Careca, ShirtColor = 2,
+            PantsColor = 9, Bottom = Bottoms.Bermuda, Shoes = Shoes.Chinelo, Body = BodyType.Barrigudo, Mustache = true,
+            Model = "Ramiro", Height = 1.82f,
+        };
+
+        /// <summary>Chefe final. Até a fase dele aparece de terno preto; na final se revela (modelo LittleTigerRevelado).</summary>
+        public static PlayerProfile LittleTiger(bool revelado = false) => new PlayerProfile
+        {
+            Name = "Little Tiger", Gender = Gender.Masculino, SkinTone = 3, Hair = HairStyle.Curto, HairColor = 0,
+            ShirtColor = revelado ? 6 : 5, PantsColor = 5, Bottom = Bottoms.Calca, Shoes = Shoes.Tenis, Body = BodyType.Magro, Chain = true,
+            Model = revelado ? "LittleTigerRevelado" : "LittleTiger", Height = 1.85f,
+        };
+
+        /// <summary>Todos os chefes, na ordem sugerida do Rei do Carteado (o Little Tiger aparece disfarçado).</summary>
+        public static List<PlayerProfile> Chefes() => new List<PlayerProfile>
+        {
+            TioBeto(), DonaCleide(), Marcela(), Ramiro(), Marquinho(), Ana(), LittleTiger(),
+        };
+
+        /// <summary>O chefe que joga em casa naquele cenário (na Sala VIP o Little Tiger já aparece revelado).</summary>
+        public static PlayerProfile ChefeDe(EnvironmentId env)
+        {
+            if (env == EnvironmentId.SalaVip) return LittleTiger(revelado: true);
+            foreach (var c in Chefes())
+                if (Names.EnvironmentOf(c.Name) == env) return c;
+            return TioBeto();
+        }
     }
 
     /// <summary>Opções do jogo (menu Opções).</summary>
@@ -114,7 +184,7 @@ namespace Cacheta.App
     public class RoomConfig
     {
         public GameMode Mode = GameMode.CachetaTradicional;
-        public EnvironmentId Environment = EnvironmentId.QuintalAoEntardecer;
+        public EnvironmentId Environment = EnvironmentId.BarDoTioBeto;
         public int Bots = 3;
         public BotDifficulty Difficulty = BotDifficulty.Medio;
         public bool Online;          // ainda não implementado: por enquanto toda sala é local contra bots
@@ -135,15 +205,34 @@ namespace Cacheta.App
 
     public static class Names
     {
-        public static string Of(GameMode m) => m == GameMode.Cachetex ? "Cachetex" : "Cacheta tradicional";
+        public static string Of(GameMode m) => m == GameMode.Cachetex ? "Carteado" : "Cacheta Clássica";
 
         public static string Of(EnvironmentId e)
         {
             switch (e)
             {
-                case EnvironmentId.Boteco: return "Boteco da esquina";
-                case EnvironmentId.Quiosque: return "Quiosque na praia";
-                default: return "Quintal ao entardecer";
+                case EnvironmentId.SalaoDeBingo: return "Salão de bingo";
+                case EnvironmentId.GaragemDaMarcela: return "Garagem da Marcela";
+                case EnvironmentId.QuintalDoRamiro: return "Churrasco do Ramiro";
+                case EnvironmentId.QuiosqueDoMarquinho: return "Quiosque do Marquinho";
+                case EnvironmentId.PatioDaUniversidade: return "Pátio da faculdade";
+                case EnvironmentId.SalaVip: return "Sala VIP";
+                default: return "Bar do Tio Beto";
+            }
+        }
+
+        /// <summary>O cenário de cada chefe (as partidas contra ele no Rei do Carteado acontecem lá).</summary>
+        public static EnvironmentId EnvironmentOf(string chefe)
+        {
+            switch (chefe)
+            {
+                case "Dona Cleide": return EnvironmentId.SalaoDeBingo;
+                case "Marcela": return EnvironmentId.GaragemDaMarcela;
+                case "Ramiro": return EnvironmentId.QuintalDoRamiro;
+                case "Marquinho": return EnvironmentId.QuiosqueDoMarquinho;
+                case "Ana": return EnvironmentId.PatioDaUniversidade;
+                case "Little Tiger": return EnvironmentId.SalaVip;
+                default: return EnvironmentId.BarDoTioBeto;
             }
         }
 

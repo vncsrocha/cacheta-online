@@ -43,7 +43,7 @@ namespace Cacheta.Core
     public sealed class RuleSet
     {
         // --- Mesa ---
-        public int MinPlayers = 2;
+        public int MinPlayers = 3;
         public int MaxPlayers = 8;
         public int DeckCount = 2;
         public int CardsPerHand = 9;
@@ -81,9 +81,31 @@ namespace Cacheta.Core
         /// <summary>Quantos tentos cada perdedor perde numa batida normal.</summary>
         public int TentosLostPerRound = 1;
         /// <summary>Batida limpa (sem usar curinga como coringa) faz os outros perderem em dobro.</summary>
-        public bool CleanBaterDoubles = true;
+        public bool CleanBaterDoubles = false;
         /// <summary>Batida de mão (na primeira vez que o jogador joga na rodada) faz os outros perderem em dobro.</summary>
         public bool FirstTurnBaterDoubles = false;
+
+        // --- Vai ou corre (Cacheta Clássica) ---
+        /// <summary>Antes de jogar, cada jogador olha a mão e a vira e decide se vai ou corre.</summary>
+        public bool VaiOuCorre = true;
+        /// <summary>Quanto perde quem correu numa batida normal.</summary>
+        public int TentosLostCorreu = 1;
+        /// <summary>Quanto perde quem foi e não bateu numa batida normal.</summary>
+        public int TentosLostFoi = 2;
+
+        // --- Batida de 10 cartas ---
+        /// <summary>Bater com as 10 cartas: 2 jogos de 3 e 1 sequência de 4 (o curinga pode estar nela), sem descartar.</summary>
+        public bool BatidaDeDez = true;
+        public int TentosLostCorreuBatidaDeDez = 2;
+        public int TentosLostFoiBatidaDeDez = 3;
+
+        // --- Bater atravessando ---
+        /// <summary>Qualquer jogador que está na rodada pode pegar o descarte de outro, fora da vez, só para bater.</summary>
+        public bool BaterAtravessando = true;
+        /// <summary>Quem pede para bater atravessando sem ter a mão completa fica a próxima rodada sem jogar.</summary>
+        public bool BaterFuradoSitsOut = true;
+        /// <summary>Quanto perde quem está de fora da rodada (cumprindo bater furado).</summary>
+        public int TentosLostSentado = 0;
 
         public static RuleSet Default() => new RuleSet();
 

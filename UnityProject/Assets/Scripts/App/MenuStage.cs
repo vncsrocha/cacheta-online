@@ -23,7 +23,7 @@ namespace Cacheta.App
             _app = app;
             _root = new GameObject("Palco do menu");
             _app.Cam.fieldOfView = 50f;
-            SetEnvironment(EnvironmentId.QuintalAoEntardecer);
+            SetEnvironment(EnvironmentId.BarDoTioBeto);
             SetAvatar(app.Profile);
         }
 

@@ -17,3 +17,7 @@ UnityProject/[Oo]bj/
 UnityProject/[Ll]ogs/
 UnityProject/*.csproj
 UnityProject/*.sln
+# Modelos 3D dos personagens: baixados pelo próprio Unity (menu Carteado > Baixar personagens 3D)
+UnityProject/Assets/Resources/Personagens/*.glb
+UnityProject/Assets/Resources/Personagens/*.glb.meta
+UnityProject/Assets/Resources/Personagens/.baixados.txt

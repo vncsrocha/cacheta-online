@@ -68,13 +68,17 @@ Regra de ouro: a cena **nunca** muda o estado do jogo por conta própria. Ela ch
 (`DrawFromStock`, `DrawFromDiscard`, `Discard`, `Bater`), recebe `ActionResult` e reage aos
 `GameEvent`. Assim, no online basta trocar a chamada local por uma mensagem ao servidor.
 
-## Regras padrão ("regra da casa")
+## Regras padrão (Cacheta Clássica)
 
 Tudo isso está em `RuleSet` e pode mudar por sala.
 
+**Vai ou corre.** A vira aparece, cada um olha a mão e, na ordem da mesa, diz se vai ou corre. Quem fala primeiro
+gira a cada rodada (como o botão do dealer). Se todo mundo correr menos um, ele ganha a rodada sem jogar.
+Quem correu não joga a rodada.
+
 | Regra | Padrão | Opções |
 |---|---|---|
-| Baralhos / jogadores / cartas na mão | 2 / 2 a 8 / 9 | configurável |
+| Baralhos / jogadores / cartas na mão | 2 / 3 a 8 / 9 | configurável |
 | Curinga | carta seguinte à vira, **mesmo naipe** (depois do K vem o A) | mesma cor, qualquer naipe, sem curinga |
 | Curingas por jogo | no máximo 1 | sem limite |
 | Curinga em trinca | pode | só em sequência |
@@ -84,8 +88,12 @@ Tudo isso está em `RuleSet` e pode mudar por sala.
 | Bater com carta do descarte | pode | não pode |
 | Descartar a carta que pegou do descarte | não pode | pode |
 | Monte acabou | reembaralha o descarte (menos a de cima) | rodada anulada |
-| Tentos | cada um começa com 10; quem não bateu perde 1 | configurável |
-| Batida limpa (sem curinga como coringa) | os outros perdem 2 | desligar |
+| Tentos | cada um começa com 10 | configurável |
+| Quando alguém bate | quem correu perde 1, quem foi e perdeu perde 2, quem bateu não perde | configurável |
+| Batida de 10 (dois jogos de 3 + sequência de 4, pode ter curinga na de 4) | quem correu perde 2, quem foi perde 3 | desligar |
+| Bater atravessando | qualquer um pode pegar o descarte de outro, fora da vez, só para bater na hora | desligar |
+| Bater furado (pediu para bater atravessando sem a mão fechar) | fica a próxima rodada de fora, a carta volta para o descarte | configurável |
+| Batida limpa (sem curinga como coringa) | normal, não dobra | dobrar |
 | Batida de mão (primeira jogada) | normal | os outros perdem em dobro |
 | Fim | quem chega a 0 tentos sai; o último que sobra leva a mesa | — |
 
@@ -96,3 +104,8 @@ Curinga usado no próprio lugar (ex.: 3♣ curinga em 2♣ 3♣ 4♣) conta como
 `SimpleBot` olha só a `PlayerView` (não vê a mão dos outros). Mede a mão por cartas soltas e "quase-jogos",
 pega o descarte quando melhora de verdade e descarta a carta que menos faz falta. Fácil erra ~30% dos descartes
 e quase nunca pega do descarte; médio erra ~8%; difícil não erra.
+
+Além da dificuldade, cada bot tem um estilo (`BotPersonality`): Medroso, Conservador, Equilibrado, Corajoso
+ou Kamikaze. O estilo muda o quanto ele arrisca no vai ou corre e o quanto ele percebe a chance de bater
+atravessando. Os personagens fixos têm estilo próprio (Tio Beto corajoso, Dona Cleide conservadora,
+Marquinho kamikaze, Ana calculista, Marcela conservadora, Ramiro corajoso, Little Tiger viciado).
