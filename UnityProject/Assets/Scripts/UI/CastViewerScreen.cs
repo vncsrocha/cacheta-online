@@ -21,8 +21,8 @@ namespace Cacheta.App
         private float _yaw, _pitch, _dist;
         private bool _dragging;
 
-        private static readonly Vector3 PlayerEye = new Vector3(0, 1.5f, -1.95f);
-        private static readonly Vector3 StandingSpot = new Vector3(1.05f, 0, -1.05f);
+        private static Vector3 PlayerEye => TableController.OverviewPos;
+        private static readonly Vector3 StandingSpot = new Vector3(1.75f, 0, -0.75f);
         private const float PanelH = 150f;
 
         public CastViewerScreen(GameApp app) => _app = app;
@@ -55,17 +55,17 @@ namespace Cacheta.App
             var look = EnvironmentBuilder.Build(CurrentEnvironment, world, _app.Cam);
             TableProps.Table(world, look);
 
-            // Mesa de 4: você, alguém à esquerda, o chefe de frente e alguém à direita.
+            // Mesa de 8 lugares com 4 jogadores: você, alguém à esquerda, o chefe de frente e alguém à direita.
             var seats = TableProps.Seats(4);
+            TableProps.Chairs(world, look);
             var others = new List<PlayerProfile>();
             for (int k = 1; others.Count < 2 && k < _cast.Count; k++)
             {
                 var p = _cast[(_index + k) % _cast.Count];
                 if (p.Name != Current.Name) others.Add(p);
             }
-            for (int i = 1; i < 4; i++) TableProps.Chair(world, seats[i], look);
-            TableProps.Seated(others[0], world, seats[1]);
-            TableProps.Seated(others[1], world, seats[3]);
+            TableProps.HoldBacks(TableProps.Seated(others[0], world, seats[1]), 9);
+            TableProps.HoldBacks(TableProps.Seated(others[1], world, seats[3]), 9);
 
             if (_standing)
             {
@@ -78,7 +78,7 @@ namespace Cacheta.App
             }
             else
             {
-                TableProps.Seated(Current, world, seats[2]);
+                TableProps.HoldBacks(TableProps.Seated(Current, world, seats[2]), 9);
                 _target = seats[2] + Vector3.up * 1.2f;
                 SetOrbit(PlayerEye);
             }

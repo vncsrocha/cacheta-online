@@ -24,7 +24,14 @@ namespace Cacheta.App
         {
             for (int i = root.transform.childCount - 1; i >= 0; i--) Object.Destroy(root.transform.GetChild(i).gameObject);
             if (ModelAvatar.TryBuild(root.transform, p.Model, seated, p.Height)) return; // modelo 3D pronto, se existir
-            new Builder(root.transform, p, seated).Build();
+            // O boneco de formas simples foi desenhado com 1,95 de altura; o mundo está em metros de verdade
+            // (1,75 m), então ele vai dentro de uma peça com 90% do tamanho.
+            var body = new GameObject("Corpo").transform;
+            body.SetParent(root.transform, false);
+            body.localScale = Vector3.one * (ModelAvatar.ReferenceHeight / 1.95f);
+            if (seated) body.localPosition = new Vector3(0, 0, -0.06f);
+            new Builder(body, p, seated).Build();
+            if (seated && root.GetComponent<CardHolder>() == null) root.AddComponent<CardHolder>();
         }
 
         private sealed class Builder
