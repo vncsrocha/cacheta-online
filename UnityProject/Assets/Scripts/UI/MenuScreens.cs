@@ -12,7 +12,7 @@ namespace Cacheta.App
 
         public void Enter()
         {
-            _app.Stage.SetEnvironment(EnvironmentId.QuintalAoEntardecer);
+            _app.Stage.SetEnvironment(EnvironmentId.BarDoTioBeto);
             _app.Stage.SetFraming(MenuStage.Framing.Menu);
         }
 

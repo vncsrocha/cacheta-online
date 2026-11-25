@@ -14,12 +14,19 @@ namespace Cacheta.App
         Cachetex,
     }
 
-    /// <summary>Ambientes onde a partida acontece. Quem cria a sala escolhe.</summary>
+    /// <summary>
+    /// Ambientes onde a partida acontece: um cenário para cada chefe do Rei do Carteado. Na Cacheta Clássica quem cria a
+    /// sala escolhe qualquer um.
+    /// </summary>
     public enum EnvironmentId
     {
-        QuintalAoEntardecer,
-        Boteco,
-        Quiosque,
+        BarDoTioBeto,
+        SalaoDeBingo,
+        GaragemDaMarcela,
+        QuintalDoRamiro,
+        QuiosqueDoMarquinho,
+        PatioDaUniversidade,
+        SalaVip,
     }
 
     public enum Gender { Masculino, Feminino, Neutro }
@@ -166,7 +173,7 @@ namespace Cacheta.App
     public class RoomConfig
     {
         public GameMode Mode = GameMode.CachetaTradicional;
-        public EnvironmentId Environment = EnvironmentId.QuintalAoEntardecer;
+        public EnvironmentId Environment = EnvironmentId.BarDoTioBeto;
         public int Bots = 3;
         public BotDifficulty Difficulty = BotDifficulty.Medio;
         public bool Online;          // ainda não implementado: por enquanto toda sala é local contra bots
@@ -193,9 +200,28 @@ namespace Cacheta.App
         {
             switch (e)
             {
-                case EnvironmentId.Boteco: return "Boteco da esquina";
-                case EnvironmentId.Quiosque: return "Quiosque na praia";
-                default: return "Quintal ao entardecer";
+                case EnvironmentId.SalaoDeBingo: return "Salão de bingo";
+                case EnvironmentId.GaragemDaMarcela: return "Garagem da Marcela";
+                case EnvironmentId.QuintalDoRamiro: return "Churrasco do Ramiro";
+                case EnvironmentId.QuiosqueDoMarquinho: return "Quiosque do Marquinho";
+                case EnvironmentId.PatioDaUniversidade: return "Pátio da faculdade";
+                case EnvironmentId.SalaVip: return "Sala VIP";
+                default: return "Bar do Tio Beto";
+            }
+        }
+
+        /// <summary>O cenário de cada chefe (as partidas contra ele no Rei do Carteado acontecem lá).</summary>
+        public static EnvironmentId EnvironmentOf(string chefe)
+        {
+            switch (chefe)
+            {
+                case "Dona Cleide": return EnvironmentId.SalaoDeBingo;
+                case "Marcela": return EnvironmentId.GaragemDaMarcela;
+                case "Ramiro": return EnvironmentId.QuintalDoRamiro;
+                case "Marquinho": return EnvironmentId.QuiosqueDoMarquinho;
+                case "Ana": return EnvironmentId.PatioDaUniversidade;
+                case "Little Tiger": return EnvironmentId.SalaVip;
+                default: return EnvironmentId.BarDoTioBeto;
             }
         }
 
