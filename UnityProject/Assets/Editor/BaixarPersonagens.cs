@@ -20,17 +20,21 @@ namespace Cacheta.EditorTools
         // Arquivo começando com ponto: o Unity ignora (não cria .meta).
         private const string Registro = Pasta + "/.baixados.txt";
 
-        /// <summary>Nome do arquivo (campo Model do perfil) e de onde baixar. Trocar a URL faz baixar a versão nova.</summary>
+        /// <summary>
+        /// Nome do arquivo (campo Model do perfil) e de onde baixar. Trocar a URL faz baixar a versão nova.
+        /// Versão de 25/11/2026: os mesmos modelos com ossos nos dedos (3 por dedo, 30 a mais por personagem), para as
+        /// mãos fecharem nas cartas; a Ana ganhou mãos novas (as do modelo original vieram fundidas).
+        /// </summary>
         private static readonly (string Nome, string Url)[] Modelos =
         {
-            ("TioBeto", "https://d8j0ntlcm91z4.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/hf_20261125_034857_552bfbe1-d25b-4bbe-b825-41527af54a80.glb"),
-            ("DonaCleide", "https://d8j0ntlcm91z4.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/hf_20261125_034858_9f7f46e0-6d78-4384-9432-92e35c70bf84.glb"),
-            ("Marcela", "https://d8j0ntlcm91z4.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/hf_20261125_034859_a331e246-ae62-4114-96cb-22e3731bfbae.glb"),
-            ("Ramiro", "https://d8j0ntlcm91z4.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/hf_20261125_034900_0a1934d0-d929-4db4-8c31-5d10cce6ba3c.glb"),
-            ("Marquinho", "https://d8j0ntlcm91z4.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/hf_20261125_034901_95190428-d75f-4d97-aa12-4b4b6ff114bf.glb"),
-            ("Ana", "https://d8j0ntlcm91z4.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/hf_20261125_034902_42ec6bfe-1600-45bf-9f03-a379577e375f.glb"),
-            ("LittleTiger", "https://d8j0ntlcm91z4.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/hf_20261125_034903_c998ad22-4314-4dba-82f0-63b638bbc74a.glb"),
-            ("LittleTigerRevelado", "https://d8j0ntlcm91z4.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/hf_20261125_034904_0a53b84c-e7aa-427f-a177-4f1f8f483bc4.glb"),
+            ("TioBeto", "https://d2ol7oe51mr4n9.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/749a04c6-b4d4-42bb-a374-4f5f281272ae.glb"),
+            ("DonaCleide", "https://d2ol7oe51mr4n9.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/9567ac2b-22c7-456a-9f84-fc859a544901.glb"),
+            ("Marcela", "https://d2ol7oe51mr4n9.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/2ae3b899-cb0b-4f77-ad38-30bf1fffb221.glb"),
+            ("Ramiro", "https://d2ol7oe51mr4n9.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/3f05b2fe-cabd-442d-8981-1161a2fcc2cd.glb"),
+            ("Marquinho", "https://d2ol7oe51mr4n9.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/b7eda6cf-3287-4f81-b590-140c26f45a68.glb"),
+            ("Ana", "https://d2ol7oe51mr4n9.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/57b688fe-72b7-43d7-a671-509f289a6f60.glb"),
+            ("LittleTiger", "https://d2ol7oe51mr4n9.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/66a8efeb-e851-481c-a37e-f7c21f7a1b8e.glb"),
+            ("LittleTigerRevelado", "https://d2ol7oe51mr4n9.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/ca667b23-0625-4c6c-9b4e-3ebbc4662457.glb"),
         };
 
         /// <summary>

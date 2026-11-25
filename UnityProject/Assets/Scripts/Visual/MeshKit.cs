@@ -44,6 +44,45 @@ namespace Cacheta.App
             return mesh;
         }
 
+        /// <summary>
+        /// Caixa de cantos arredondados (superelipsoide) de tamanho 1, centrada na origem. <paramref name="round"/> = 1
+        /// é uma esfera e, quanto mais perto de 0, mais parece um cubo. Serve para palmas, unhas e peças macias.
+        /// </summary>
+        public static Mesh RoundBox(float round = 0.45f, int segments = 24)
+        {
+            string key = "roundbox " + round.ToString("0.00") + " " + segments;
+            if (Cache.TryGetValue(key, out var cached) && cached != null) return cached;
+            int rings = segments / 2, ring = segments + 1;
+            var verts = new Vector3[(rings + 1) * ring];
+            var normals = new Vector3[verts.Length];
+            for (int i = 0; i <= rings; i++)
+            {
+                float lat = Mathf.PI * i / rings - Mathf.PI / 2f;
+                for (int j = 0; j <= segments; j++)
+                {
+                    float lon = 2f * Mathf.PI * j / segments;
+                    var d = new Vector3(Mathf.Cos(lat) * Mathf.Cos(lon), Mathf.Sin(lat), Mathf.Cos(lat) * Mathf.Sin(lon));
+                    verts[i * ring + j] = new Vector3(Pow(d.x, round), Pow(d.y, round), Pow(d.z, round)) * 0.5f;
+                    // normal da superfície |x|^(2/e) + |y|^(2/e) + |z|^(2/e) = 1 nesse ponto
+                    normals[i * ring + j] = new Vector3(Pow(d.x, 2f - round), Pow(d.y, 2f - round), Pow(d.z, 2f - round)).normalized;
+                }
+            }
+            var tris = new List<int>();
+            for (int i = 0; i < rings; i++)
+                for (int j = 0; j < segments; j++)
+                {
+                    int a = i * ring + j, b = a + ring;
+                    tris.Add(a); tris.Add(b); tris.Add(b + 1);
+                    tris.Add(a); tris.Add(b + 1); tris.Add(a + 1);
+                }
+            var mesh = new Mesh { name = key, vertices = verts, normals = normals, triangles = tris.ToArray() };
+            mesh.RecalculateBounds();
+            Cache[key] = mesh;
+            return mesh;
+        }
+
+        private static float Pow(float v, float e) => Mathf.Sign(v) * Mathf.Pow(Mathf.Abs(v), e);
+
         /// <summary>Cria um objeto com a malha e a cor (material de contorno do jogo).</summary>
         public static GameObject Piece(Mesh mesh, Transform parent, Vector3 localPos, Color color, string name)
         {

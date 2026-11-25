@@ -25,7 +25,9 @@ namespace Cacheta.App
     ///     deixa todos com o ombro caído) e a cabeça olhando para um lado, com uma respiração lenta;
     ///  2. o jeito de segurar (<see cref="HoldStyle"/>) decide onde fica o leque e o que cada mão faz: segura o leque
     ///     por trás (dedos para cima, palma para quem segura) ou descansa na mesa com a palma para baixo;
-    ///  3. braços dobrados por IK de dois ossos e mãos viradas para isso.
+    ///  3. braços dobrados por IK de dois ossos e mãos viradas para isso;
+    ///  4. dedos (nos modelos com ossos de dedos): fecham nas cartas por trás do leque sem atravessar as cartas, a mão
+    ///     da mesa encosta as pontas dos dedos no tampo e de vez em quando tamborila, e tudo mexe um pouquinho.
     /// O jeito vem do personagem (<see cref="StyleOf"/>) e o resto é sorteado pelo nome do modelo, sempre igual para
     /// o mesmo personagem. No boneco de formas simples o leque só fica na frente dele.
     /// </summary>
@@ -77,7 +79,51 @@ namespace Cacheta.App
         {
             public Transform Upper, Lower, Hand;
             public int LowerIndex = -1, HandIndex = -1; // índices no SkinnedMeshRenderer (pose de origem)
+            public HandRig Rig;                         // ossos dos dedos (nulo nos modelos sem dedos)
         }
+
+        private enum Role { Both, Hold, Rest }
+
+        /// <summary>
+        /// Ossos dos dedos de uma mão e as direções para dobrar cada um, no espaço do osso da mão. Os ossos dos dedos
+        /// saem do modelo sem giro nenhum, então a mesma direção serve para as três falanges.
+        /// </summary>
+        private class HandRig
+        {
+            public readonly Transform[][] Fingers = new Transform[4][]; // indicador, médio, anelar e mínimo: 3 falanges
+            public readonly Transform[] Tips = new Transform[4];        // ponta de cada dedo
+            public readonly Vector3[] Axis = new Vector3[4];            // em volta do que cada dedo dobra
+            public readonly float[] Spread = new float[4];              // graus que faltam para o dedo encostar no médio
+            public readonly float[] Curl = new float[4];                // quanto cada dedo está dobrado agora (suavizado)
+            public Transform[] Thumb;
+            public Vector3 ThumbAxis;
+            public Vector3 Along, Palm;  // para onde apontam os dedos e a palma
+            public float KnuckleDepth;   // quanto os nós dos dedos ficam para o lado da palma, a partir do pulso
+            public bool Posed;
+        }
+
+        /// <summary>Quanto cada articulação dobra, em graus (base, meio e ponta de cada dedo; o polegar igual).</summary>
+        private sealed class Grip
+        {
+            public Vector3[] Fingers; // indicador, médio, anelar, mínimo
+            public Vector3 Thumb;
+            public float Together;    // 0 = dedos abertos como no modelo, 1 = todos encostados no médio
+        }
+
+        private static Grip MakeGrip(float together, Vector3 thumb, params Vector3[] fingers)
+            => new Grip { Fingers = fingers, Thumb = thumb, Together = together };
+
+        // As dobras são o máximo: segurando, cada dedo para quando a ponta chega nas cartas; na mesa, quando encosta no tampo.
+        private static readonly Grip GripOne = MakeGrip(0.9f, new Vector3(25, 18, 12),
+            new Vector3(30, 40, 20), new Vector3(34, 42, 22), new Vector3(50, 60, 35), new Vector3(58, 65, 40));
+        private static readonly Grip GripTwo = MakeGrip(0.75f, new Vector3(22, 15, 10),
+            new Vector3(26, 36, 18), new Vector3(30, 40, 20), new Vector3(45, 55, 32), new Vector3(52, 60, 36));
+        private static readonly Grip GripTable = MakeGrip(0.3f, new Vector3(8, 10, 8),
+            new Vector3(14, 20, 12), new Vector3(16, 22, 12), new Vector3(19, 25, 15), new Vector3(22, 27, 17));
+        private static readonly Grip GripLoose = MakeGrip(0.2f, new Vector3(5, 8, 8),
+            new Vector3(8, 12, 8), new Vector3(10, 14, 8), new Vector3(12, 16, 10), new Vector3(14, 18, 12));
+
+        private static readonly string[] FingerNames = { "Index", "Middle", "Ring", "Pinky" };
 
         /// <summary>Guarda a rotação de um osso para desfazer o que a postura e a IK mexeram no quadro anterior.</summary>
         private class Guard
@@ -101,6 +147,11 @@ namespace Cacheta.App
             _clavL = Bone("LeftShoulder");
             _clavR = Bone("RightShoulder");
             _skin = GetComponentInChildren<SkinnedMeshRenderer>();
+            if (_rig)
+            {
+                _left.Rig = MakeHandRig(_left.Hand, "Left", true);
+                _right.Rig = MakeHandRig(_right.Hand, "Right", false);
+            }
             if (_rig && _skin != null)
             {
                 var bones = _skin.bones;
@@ -170,6 +221,58 @@ namespace Cacheta.App
             return a.Upper != null && a.Lower != null && a.Hand != null ? a : null;
         }
 
+        /// <summary>
+        /// Acha os ossos dos dedos ({Lado}Hand{Dedo}1 a 4, o 4 é só a ponta) e mede a mão na pose de origem: para onde
+        /// apontam os dedos, para onde fica a palma e em volta do que cada dedo dobra. Nulo se o modelo não tiver dedos.
+        /// </summary>
+        private static HandRig MakeHandRig(Transform hand, string side, bool left)
+        {
+            var rig = new HandRig();
+            var pts = new Vector3[5][];
+            for (int k = 0; k < 5; k++)
+            {
+                string finger = k < 4 ? FingerNames[k] : "Thumb";
+                var bones = new Transform[4];
+                var p = new Vector3[4];
+                var at = Vector3.zero;
+                var rot = Quaternion.identity;
+                for (int j = 0; j < 4; j++)
+                {
+                    bones[j] = ModelAvatar.FindDeep(hand, side + "Hand" + finger + (j + 1));
+                    if (bones[j] == null) return null;
+                    at += rot * bones[j].localPosition;
+                    rot *= bones[j].localRotation;
+                    p[j] = at; // no espaço do osso da mão
+                }
+                pts[k] = p;
+                var three = new[] { bones[0], bones[1], bones[2] };
+                if (k < 4) { rig.Fingers[k] = three; rig.Tips[k] = bones[3]; }
+                else rig.Thumb = three;
+            }
+
+            Vector3[] index = pts[0], middle = pts[1], pinky = pts[3], thumb = pts[4];
+            rig.Along = (middle[3] - middle[0]).normalized;
+            var toThumb = (index[0] - pinky[0]).normalized;
+            // O Unity espelha o glTF no X, então a palma sai deste produto vetorial (conferido nas duas mãos).
+            rig.Palm = (left ? Vector3.Cross(toThumb, rig.Along) : Vector3.Cross(rig.Along, toThumb)).normalized;
+            for (int k = 0; k < 4; k++)
+            {
+                var u = (pts[k][3] - pts[k][0]).normalized;
+                rig.Axis[k] = Vector3.Cross(u, rig.Palm).normalized;
+                rig.Spread[k] = Vector3.SignedAngle(Vector3.ProjectOnPlane(u, rig.Palm), Vector3.ProjectOnPlane(rig.Along, rig.Palm), rig.Palm);
+                rig.KnuckleDepth += Vector3.Dot(pts[k][0], rig.Palm) / 4f;
+            }
+            // O polegar dobra para a base do médio, um pouco acima da palma.
+            float length = (middle[3] - middle[0]).magnitude;
+            var ut = (thumb[3] - thumb[1]).normalized;
+            var toPalm = Vector3.ProjectOnPlane(middle[0] + rig.Palm * (0.25f * length) - thumb[1], ut).normalized;
+            rig.ThumbAxis = Vector3.Cross(ut, toPalm).normalized;
+            return rig;
+        }
+
+        /// <summary>Quantas cartas de espessura o leque tem (as cartas ficam atrás do plano do leque, para a mesa).</summary>
+        private float Stack => Mathf.Max(0, Cards - 1) * 0.0015f;
+
         /// <summary>Põe a carta i de n no leque (posição, giro e tamanho dentro de <see cref="Fan"/>).</summary>
         public void LayCard(Transform card, int i, int n)
         {
@@ -231,8 +334,15 @@ namespace Cacheta.App
             if (!_rig) return;
             if (Cards > 0)
             {
+                KeepFanInReach(right);
                 UseArm(_left, -1, sh, right, up, fwd);
                 UseArm(_right, 1, sh, right, up, fwd);
+            }
+            else
+            {
+                // Sem cartas os braços ficam na pose da animação, com os dedos soltos.
+                foreach (var a in new[] { _left, _right })
+                    if (a.Rig != null) PoseFingers(a.Rig, GripLoose, Role.Rest, a == _left ? -1 : 1, fit: false);
             }
             foreach (var g in _guards) g.Set = g.Bone.localRotation;
         }
@@ -275,27 +385,27 @@ namespace Cacheta.App
         }
 
         /// <summary>
-        /// Decide o que o braço faz (segura o leque por trás ou descansa na mesa), leva o pulso até lá com IK e vira a
-        /// mão.
+        /// Decide o que o braço faz (segura o leque por trás ou descansa na mesa), leva o pulso até lá com IK, vira a
+        /// mão e fecha os dedos.
         /// </summary>
         private void UseArm(Arm arm, int side, Vector3 sh, Vector3 right, Vector3 up, Vector3 fwd)
         {
             var fY = Fan.up;
             var fZ = Fan.forward; // para quem segura
-            bool both = Style == HoldStyle.Duas;
+            var role = RoleOf(side);
             Vector3 wrist, pole, fingers, palm;
-            if (both)
+            if (role == Role.Both)
             {
                 // As duas mãos seguram os lados do leque; os dedos cobrem só a parte de baixo das cartas.
-                wrist = Fan.position + right * (side * 0.13f) - fY * 0.19f - fZ * 0.02f;
+                wrist = HoldWrist(arm, side, role, right);
                 pole = arm.Upper.position + right * (side * 0.3f) - up * 0.5f - fwd * 0.05f;
                 fingers = (fY - right * (side * 0.45f)).normalized;
                 palm = fZ;
             }
-            else if (side == _holdSide)
+            else if (role == Role.Hold)
             {
                 // Uma mão só segura o leque por baixo, pelo meio.
-                wrist = Fan.position + right * (side * 0.03f) - fY * (Style == HoldStyle.Mesa ? 0.12f : 0.17f) - fZ * 0.02f;
+                wrist = HoldWrist(arm, side, role, right);
                 pole = Style == HoldStyle.Cotovelo
                     ? _elbowOnTable - up * 0.3f + fwd * 0.1f
                     : arm.Upper.position + right * (side * 0.3f) - up * 0.5f - fwd * 0.05f;
@@ -307,17 +417,181 @@ namespace Cacheta.App
                 // A outra mão descansa na mesa, com a palma para baixo e os dedos para o meio da mesa.
                 wrist = sh + right * (side * 0.17f) + fwd * 0.44f;
                 wrist.y = TableProps.TableTop + 0.04f;
+                wrist = InReach(arm, wrist);
                 pole = arm.Upper.position + right * (side * 0.35f) - up * 0.3f;
                 fingers = (fwd - right * (side * 0.35f)).normalized;
                 palm = -up;
             }
             TwoBoneIK.Solve(arm.Upper, arm.Lower, arm.Hand, wrist, pole);
             OrientHand(arm, fingers, palm);
+            if (arm.Rig != null)
+                PoseFingers(arm.Rig, role == Role.Both ? GripTwo : role == Role.Hold ? GripOne : GripTable, role, side, fit: true);
+        }
+
+        private Role RoleOf(int side) => Style == HoldStyle.Duas ? Role.Both : side == _holdSide ? Role.Hold : Role.Rest;
+
+        /// <summary>
+        /// Onde fica o pulso da mão que segura: abaixo do leque e atrás das cartas. Com dedos, a mão fica mais para trás
+        /// (os dedos dobram até encostar no verso das cartas) e mais alta (os dedos cobrem a parte de baixo do leque).
+        /// </summary>
+        private Vector3 HoldWrist(Arm arm, int side, Role role, Vector3 right)
+        {
+            var fY = Fan.up;
+            var fZ = Fan.forward;
+            bool fingers = arm.Rig != null;
+            float depth = fingers ? Stack + 0.05f + arm.Rig.KnuckleDepth * arm.Hand.lossyScale.x : 0.02f;
+            if (role == Role.Both)
+                return Fan.position + right * (side * 0.13f) - fY * (fingers ? 0.125f : 0.19f) - fZ * depth;
+            float low = Style == HoldStyle.Mesa ? (fingers ? 0.09f : 0.12f) : (fingers ? 0.12f : 0.17f);
+            return Fan.position + right * (side * 0.03f) - fY * low - fZ * depth;
+        }
+
+        /// <summary>Até onde o braço alcança, quase esticado.</summary>
+        private static float Reach(Arm a)
+            => 0.97f * ((a.Lower.position - a.Upper.position).magnitude + (a.Hand.position - a.Lower.position).magnitude);
+
+        /// <summary>
+        /// Personagens de braço curto não alcançam o leque em alguns jeitos (ele ficava solto no ar): traz o leque para
+        /// perto até a mão que segura alcançar.
+        /// </summary>
+        private void KeepFanInReach(Vector3 right)
+        {
+            var shift = Vector3.zero;
+            for (int i = 0; i < 2; i++)
+            {
+                var arm = i == 0 ? _left : _right;
+                int side = i == 0 ? -1 : 1;
+                var role = RoleOf(side);
+                if (role == Role.Rest) continue;
+                var wrist = HoldWrist(arm, side, role, right);
+                var d = wrist - arm.Upper.position;
+                float reach = Reach(arm);
+                if (d.magnitude <= reach) continue;
+                var need = arm.Upper.position + d.normalized * reach - wrist;
+                if (need.sqrMagnitude > shift.sqrMagnitude) shift = need;
+            }
+            Fan.position += shift;
+        }
+
+        /// <summary>A mão que descansa: se a mesa ficar longe demais, apoia mais perto do corpo, na mesma altura.</summary>
+        private static Vector3 InReach(Arm arm, Vector3 wrist)
+        {
+            var s = arm.Upper.position;
+            var d = wrist - s;
+            float reach = Reach(arm);
+            if (d.magnitude <= reach) return wrist;
+            var flat = new Vector3(d.x, 0f, d.z);
+            float h = reach > Mathf.Abs(d.y) ? Mathf.Sqrt(reach * reach - d.y * d.y) : 0f;
+            return s + flat.normalized * h + Vector3.up * d.y;
+        }
+
+        /// <summary>
+        /// Fecha os dedos no jeito pedido. Com <paramref name="fit"/>, cada dedo para antes de atravessar as cartas
+        /// (segurando) ou o tampo da mesa (descansando: aí as pontas encostam na mesa). Por cima disso, um mexer bem
+        /// pequeno de cada dedo e do polegar e, na mão da mesa, o tamborilar de vez em quando.
+        /// </summary>
+        private void PoseFingers(HandRig rig, Grip grip, Role role, int side, bool fit)
+        {
+            float t = Time.time;
+            float smooth = rig.Posed ? 1f - Mathf.Exp(-12f * Time.deltaTime) : 1f;
+            bool table = role == Role.Rest;
+            for (int k = 0; k < 4; k++)
+            {
+                float c = fit ? FitFinger(rig, k, grip, table ? 1.6f : 1f, table) : 1f;
+                rig.Curl[k] = Mathf.Lerp(rig.Curl[k], c, smooth);
+                float wiggle = Mathf.Sin(t * (0.8f + 0.17f * k) + _phase * (k + 1) + side) * 1.5f;
+                float lift = table && fit ? Drum(t, k) * 24f : 0f;
+                SetFinger(rig, k, grip, rig.Curl[k], wiggle - lift);
+            }
+            rig.Posed = true;
+            float thumb = Mathf.Sin(t * 0.5f + _phase * 2f + side) * 3f;
+            rig.Thumb[0].localRotation = Quaternion.AngleAxis(grip.Thumb.x + thumb, rig.ThumbAxis);
+            rig.Thumb[1].localRotation = Quaternion.AngleAxis(grip.Thumb.y + thumb * 0.5f, rig.ThumbAxis);
+            rig.Thumb[2].localRotation = Quaternion.AngleAxis(grip.Thumb.z + thumb * 0.5f, rig.ThumbAxis);
+        }
+
+        /// <summary>
+        /// Dobra um dedo: <paramref name="amount"/> vezes o que o jeito pede, mais <paramref name="extra"/> graus na base
+        /// (negativo levanta o dedo). Antes de dobrar, o dedo chega para perto do médio.
+        /// </summary>
+        private static void SetFinger(HandRig rig, int k, Grip grip, float amount, float extra)
+        {
+            var b = rig.Fingers[k];
+            var deg = grip.Fingers[k];
+            var axis = rig.Axis[k];
+            b[0].localRotation = Quaternion.AngleAxis(rig.Spread[k] * grip.Together, rig.Palm)
+                                 * Quaternion.AngleAxis(deg.x * amount + extra, axis);
+            b[1].localRotation = Quaternion.AngleAxis(deg.y * amount + extra * 0.35f, axis);
+            b[2].localRotation = Quaternion.AngleAxis(deg.z * amount, axis);
+        }
+
+        /// <summary>
+        /// O quanto dá para dobrar o dedo (0 a <paramref name="max"/>) sem a ponta atravessar o limite: o verso das
+        /// cartas ou o tampo da mesa. Busca binária na dobra; o dedo fica dobrado no fim (quem chama ajusta de novo).
+        /// </summary>
+        private float FitFinger(HandRig rig, int k, Grip grip, float max, bool table)
+        {
+            SetFinger(rig, k, grip, max, 0f);
+            if (TipOk(rig.Tips[k].position, true, table)) return max;
+            SetFinger(rig, k, grip, 0f, 0f);
+            if (!TipOk(rig.Tips[k].position, false, table)) return 0f;
+            float lo = 0f, hi = max;
+            for (int i = 0; i < 6; i++)
+            {
+                float mid = (lo + hi) / 2f;
+                SetFinger(rig, k, grip, mid, 0f);
+                if (TipOk(rig.Tips[k].position, false, table)) lo = mid;
+                else hi = mid;
+            }
+            return lo;
+        }
+
+        /// <summary>
+        /// A ponta do dedo está no lugar? Na mesa: acima do tampo. Segurando: atrás da última carta; com o dedo todo
+        /// dobrado (<paramref name="full"/>), também vale ficar fora do leque (abaixo dele ou do lado), onde o dedo pode
+        /// fechar à vontade.
+        /// </summary>
+        private bool TipOk(Vector3 tip, bool full, bool table)
+        {
+            if (table) return tip.y >= TableProps.TableTop + 0.008f;
+            var l = Fan.InverseTransformPoint(tip);
+            if (full)
+            {
+                float half = Mathf.Max(0, Cards - 1) / 2f * _spread + CardW / 2f;
+                if (l.y < -CardH / 2f - 1.5f * l.x * l.x - 0.01f || Mathf.Abs(l.x) > half + 0.005f) return true;
+            }
+            return -l.z >= Stack + 0.006f;
+        }
+
+        /// <summary>
+        /// Mania de tamborilar na mesa (nem todo mundo tem): de tempos em tempos os dedos batem do mínimo para o
+        /// indicador, duas vezes. Devolve quanto o dedo está levantado (0 a 1).
+        /// </summary>
+        private float Drum(float t, int finger)
+        {
+            if (R(_seed, 13) < 0.35f) return 0f;
+            float period = 7f + R(_seed, 14) * 6f;
+            float u = Mathf.Repeat(t + _phase * 2f, period);
+            float lift = 0f;
+            for (int round = 0; round < 2; round++)
+            {
+                float x = (u - round * 0.55f - (3 - finger) * 0.09f) / 0.2f;
+                if (x > 0f && x < 1f) lift = Mathf.Max(lift, Mathf.Sin(x * Mathf.PI));
+            }
+            return lift;
         }
 
         /// <summary>Vira a mão para os dedos apontarem em <paramref name="fingers"/> com a palma para <paramref name="palm"/>.</summary>
         private void OrientHand(Arm arm, Vector3 fingers, Vector3 palm)
         {
+            if (arm.Rig != null)
+            {
+                // Com dedos, a mão sabe para onde aponta e onde fica a palma (vale para qualquer modelo, mesmo os que
+                // vieram com a palma virada para trás na pose de origem).
+                arm.Hand.rotation = Quaternion.LookRotation(fingers, palm)
+                                    * Quaternion.Inverse(Quaternion.LookRotation(arm.Rig.Along, arm.Rig.Palm));
+                return;
+            }
             if (_skin == null || arm.LowerIndex < 0 || arm.HandIndex < 0) return;
             // Pose de origem (A-pose) da mão: dedos na direção do antebraço e palma virada para o meio do corpo.
             var toWorld = _skin.transform.localToWorldMatrix;
