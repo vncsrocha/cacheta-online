@@ -33,6 +33,12 @@ namespace Cacheta.EditorTools
             ("LittleTigerRevelado", "https://d8j0ntlcm91z4.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/hf_20261125_034904_0a53b84c-e7aa-427f-a177-4f1f8f483bc4.glb"),
         };
 
+        /// <summary>
+        /// Sobe este número quando os .glb já baixados precisam ser importados de novo (por exemplo, quando faltava
+        /// o módulo Image Conversion e o glTFast importou os modelos sem textura).
+        /// </summary>
+        private const string VersaoImportacao = "2";
+
         private static bool _rodando;
 
         static BaixarPersonagens()
@@ -43,6 +49,22 @@ namespace Cacheta.EditorTools
         [MenuItem("Carteado/Baixar personagens 3D")]
         private static void BaixarTudo() => Baixar(forcar: true);
 
+        [MenuItem("Carteado/Reimportar personagens 3D")]
+        private static void Reimportar()
+        {
+            int n = 0;
+            foreach (var m in Modelos)
+            {
+                if (!File.Exists(Caminho(m.Nome))) continue;
+                AssetDatabase.ImportAsset(Caminho(m.Nome).Replace('\\', '/'), ImportAssetOptions.ForceUpdate);
+                n++;
+            }
+            var reg = LerRegistro();
+            reg["_importacao"] = VersaoImportacao;
+            SalvarRegistro(reg);
+            if (n > 0) Debug.Log($"[Carteado] {n} personagem(ns) 3D importado(s) de novo.");
+        }
+
         private static string Caminho(string nome) => Path.Combine(Pasta, nome + ".glb");
 
         private static async void Baixar(bool forcar)
@@ -51,7 +73,12 @@ namespace Cacheta.EditorTools
             var reg = LerRegistro();
             var faltam = Modelos.Where(m => forcar || !File.Exists(Caminho(m.Nome))
                                             || !reg.TryGetValue(m.Nome, out var url) || url != m.Url).ToList();
-            if (faltam.Count == 0) return;
+            if (faltam.Count == 0)
+            {
+                // Já baixados, mas importados por uma versão antiga do projeto: importa de novo.
+                if (!reg.TryGetValue("_importacao", out var v) || v != VersaoImportacao) Reimportar();
+                return;
+            }
 
             _rodando = true;
             int ok = 0;
@@ -77,6 +104,7 @@ namespace Cacheta.EditorTools
                         }
                     }
                 }
+                reg["_importacao"] = VersaoImportacao;
                 SalvarRegistro(reg);
             }
             finally

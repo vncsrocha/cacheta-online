@@ -12,6 +12,9 @@ namespace Cacheta.App
         JoinRoom,
         Table,
         Elenco,
+        ReiDoCarteado,
+        Fichario,
+        Loja,
     }
 
     /// <summary>Uma tela do jogo. As telas só desenham e chamam ações; o estado fica no <see cref="GameApp"/>.</summary>
@@ -81,6 +84,11 @@ namespace Cacheta.App
             _screens[ScreenId.JoinRoom] = new JoinRoomScreen(this);
             _screens[ScreenId.Table] = new TableScreen(this);
             _screens[ScreenId.Elenco] = new CastViewerScreen(this);
+            _screens[ScreenId.ReiDoCarteado] = new ReiDoCarteadoScreen(this);
+            _screens[ScreenId.Fichario] = new EmBreveScreen(this, "Fichário",
+                "Sua coleção: os power-ups que você ganhou nos packs, os colecionáveis dos chefes e a montagem do seu deck de power-ups para o Carteado.");
+            _screens[ScreenId.Loja] = new EmBreveScreen(this, "Loja",
+                "Packs Básico e Resenha, comprados com moedas do jogo. Cartas repetidas viram moedas. O pack Apelão só sai jogando rankeada.");
 
             // Primeira vez: começa criando o personagem.
             Go(SaveSystem.HasProfile ? ScreenId.MainMenu : ScreenId.Profile);
