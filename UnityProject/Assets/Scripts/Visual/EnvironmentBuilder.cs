@@ -22,10 +22,11 @@ namespace Cacheta.App
     public static class EnvironmentBuilder
     {
         // ------------------------------------------------------------------ medidas da sala
-        private const float W = 5.2f;    // meia largura: paredes laterais em x = ±W
-        private const float D = 4.6f;    // face interna da parede do fundo
-        private const float F = -7.6f;   // frente da sala (atrás da câmera do menu, não tem parede)
-        private const float H = 3.4f;    // pé-direito
+        // Vêm da planta de cada cenário (Resources/Plantas); estes são os valores padrão.
+        private static float W = 5.2f;   // meia largura: paredes laterais em x = ±W
+        private static float D = 4.6f;   // face interna da parede do fundo
+        private static float F = -7.6f;  // frente da sala (atrás da câmera do menu, não tem parede)
+        private static float H = 3.4f;   // pé-direito
         private const float T = 0.2f;    // espessura das paredes
 
         private enum Side { Fundo, Esquerda, Direita }
@@ -60,16 +61,107 @@ namespace Cacheta.App
         {
             var root = new GameObject("Ambiente " + id).transform;
             root.SetParent(parent, false);
+
+            // A planta (editada no artefato de plantas) manda nas medidas da sala, nos vãos e na posição de cada peça.
+            _planta = Planta.Load(id);
+            _original = Planta.LoadOriginal(id);
+            var sala = (_planta ?? _original)?.sala;
+            W = sala != null && sala.largura > 1 ? sala.largura / 2 : 5.2f;
+            D = sala != null && sala.fundo > 1 ? sala.fundo : 4.6f;
+            F = sala != null && sala.frente < -1 ? sala.frente : -7.6f;
+            H = sala != null && sala.pe > 2 ? sala.pe : 3.4f;
+            _pieces.Clear();
+
+            EnvironmentLook look;
             switch (id)
             {
-                case EnvironmentId.SalaoDeBingo: return SalaoDeBingo(root, cam);
-                case EnvironmentId.GaragemDaMarcela: return GaragemDaMarcela(root, cam);
-                case EnvironmentId.QuintalDoRamiro: return QuintalDoRamiro(root, cam);
-                case EnvironmentId.QuiosqueDoMarquinho: return QuiosqueDoMarquinho(root, cam);
-                case EnvironmentId.PatioDaUniversidade: return PatioDaUniversidade(root, cam);
-                case EnvironmentId.SalaVip: return SalaVip(root, cam);
-                default: return BarDoTioBeto(root, cam);
+                case EnvironmentId.SalaoDeBingo: look = SalaoDeBingo(root, cam); break;
+                case EnvironmentId.GaragemDaMarcela: look = GaragemDaMarcela(root, cam); break;
+                case EnvironmentId.QuintalDoRamiro: look = QuintalDoRamiro(root, cam); break;
+                case EnvironmentId.QuiosqueDoMarquinho: look = QuiosqueDoMarquinho(root, cam); break;
+                case EnvironmentId.PatioDaUniversidade: look = PatioDaUniversidade(root, cam); break;
+                case EnvironmentId.SalaVip: look = SalaVip(root, cam); break;
+                default: look = BarDoTioBeto(root, cam); break;
             }
+            ApplyPlanta(root);
+            _pieces.Clear();
+            return look;
+        }
+
+        // ------------------------------------------------------------------ planta: peças com id
+
+        private static Planta _planta, _original;
+        private static readonly Dictionary<string, Transform> _pieces = new Dictionary<string, Transform>();
+
+        /// <summary>
+        /// A peça da planta com esse id (o1, o2...). Tudo o que é montado dentro dela anda, gira, muda de tamanho ou
+        /// some junto quando a peça é mexida na planta.
+        /// </summary>
+        private static Transform P(Transform r, string id)
+        {
+            if (_pieces.TryGetValue(id, out var t) && t != null) return t;
+            var orig = _original?.Find(id);
+            t = new GameObject(orig != null ? $"{id} {orig.nome}" : id).transform;
+            t.SetParent(r, false);
+            _pieces[id] = t;
+            return t;
+        }
+
+        /// <summary>
+        /// Compara a planta atual com a original e aplica as diferenças: peça movida, girada ou redimensionada, peça
+        /// apagada e peça nova (que aparece como um bloco na cor e no tamanho da planta, até ganhar modelo).
+        /// </summary>
+        private static void ApplyPlanta(Transform root)
+        {
+            if (_planta == null || _original == null) return;
+            foreach (var kv in _pieces)
+            {
+                var piece = kv.Value;
+                var o = _original.Find(kv.Key);
+                if (piece == null || o == null) continue;
+                var n = _planta.Find(kv.Key);
+                if (n == null) { Object.Destroy(piece.gameObject); continue; }
+                float sx = o.w > 0.01f && n.w > 0.01f ? n.w / o.w : 1f;
+                float sz = o.d > 0.01f && n.d > 0.01f ? n.d / o.d : 1f;
+                float sy = o.h > 0.01f && n.h > 0.01f ? n.h / o.h : 1f;
+                bool moved = Mathf.Abs(n.x - o.x) > 0.001f || Mathf.Abs(n.z - o.z) > 0.001f || Mathf.Abs(n.rot - o.rot) > 0.01f;
+                bool resized = Mathf.Abs(sx - 1) > 0.001f || Mathf.Abs(sy - 1) > 0.001f || Mathf.Abs(sz - 1) > 0.001f;
+                if (!moved && !resized) continue;
+
+                // A peça gira e estica em volta do próprio centro: desfaz a posição e o giro originais, estica nos
+                // eixos dela e põe no lugar novo, com o giro novo.
+                var outer = new GameObject(piece.name).transform;
+                outer.SetParent(root, false);
+                outer.localPosition = new Vector3(o.x, 0, o.z);
+                var inner = new GameObject("giro original").transform;
+                inner.SetParent(outer, false);
+                inner.localRotation = Quaternion.Euler(0, -o.rot, 0);
+                piece.SetParent(inner, true);
+                outer.localPosition = new Vector3(n.x, 0, n.z);
+                outer.localRotation = Quaternion.Euler(0, n.rot, 0);
+                outer.localScale = new Vector3(sx, sy, sz);
+            }
+
+            foreach (var n in _planta.objetos ?? new PlantaObjeto[0])
+                if (_original.Find(n.id) == null) NewPiece(root, n);
+        }
+
+        /// <summary>Peça que só existe na planta: um bloco (ou cilindro) com a cor e o tamanho de lá.</summary>
+        private static void NewPiece(Transform root, PlantaObjeto n)
+        {
+            var c = Planta.Color(n.cor, new Color(0.8f, 0.8f, 0.8f));
+            float w = Mathf.Max(0.05f, n.w), d = Mathf.Max(0.05f, n.d);
+            float h, y;
+            switch (n.onde)
+            {
+                case "parede": h = n.h > 0 ? n.h : 0.8f; y = 1.6f; break;
+                case "teto": h = n.h > 0 ? n.h : 0.12f; y = H - h / 2; break;
+                case "fora": h = n.h > 0 ? n.h : 0.05f; y = h / 2; break;
+                default: h = n.h > 0 ? n.h : 0.8f; y = h / 2; break;
+            }
+            var go = Palette.Prim(n.forma == "circ" ? PrimitiveType.Cylinder : PrimitiveType.Cube, root, new Vector3(n.x, y, n.z),
+                                  n.forma == "circ" ? new Vector3(w, h / 2, d) : new Vector3(w, h, d), c, $"{n.id} {n.nome} (novo)");
+            go.transform.localRotation = Quaternion.Euler(0, n.rot, 0);
         }
 
         // ================================================================== 1. Tio Beto: fundos do bar
@@ -92,37 +184,37 @@ namespace Cacheta.App
             Light(r, new Color(1f, 0.9f, 0.72f), 1.05f, new Vector3(48, -22, 0), new Color(0.48f, 0.42f, 0.4f));
 
             // Lá fora: calçada, rua e casas do outro lado.
-            Street(r, new Color(0.8f, 0.77f, 0.72f));
+            Street(P(r, "o15"), new Color(0.8f, 0.77f, 0.72f));
             float[] widths = { 4.5f, 5f, 4f, 5.5f, 4.5f };
             Color[] houses = { new Color(0.95f, 0.6f, 0.62f), new Color(0.98f, 0.85f, 0.4f), new Color(0.5f, 0.72f, 0.9f),
                                new Color(0.6f, 0.82f, 0.55f), new Color(0.98f, 0.72f, 0.45f) };
             float x = -9f;
             for (int i = 0; i < widths.Length; i++)
             {
-                Facade(r, new Vector3(x + widths[i] / 2, 0, D + 13f), widths[i] - 0.1f, 3.6f + (i % 3) * 1.2f, houses[i],
+                Facade(P(r, "o16"), new Vector3(x + widths[i] / 2, 0, D + 13f), widths[i] - 0.1f, 3.6f + (i % 3) * 1.2f, houses[i],
                        new Color(0.25f, 0.35f, 0.45f), floors: i % 3 == 2 ? 2 : 1);
                 x += widths[i];
             }
-            Tree(r, new Vector3(6.5f, 0, D + 3.2f), 2.4f, new Color(0.24f, 0.5f, 0.24f), 2.2f);
-            LampPost(r, new Vector3(-1.5f, 0, D + 3.0f));
+            Tree(P(r, "o17"), new Vector3(6.5f, 0, D + 3.2f), 2.4f, new Color(0.24f, 0.5f, 0.24f), 2.2f);
+            LampPost(P(r, "o18"), new Vector3(-1.5f, 0, D + 3.0f));
 
             // Dentro: geladeiras, balcão, prateleira de garrafas, quadro de preços, TV, engradados.
-            Fridge(r, new Vector3(-4.3f, 0, D - 0.42f), 0f, new Color(0.86f, 0.18f, 0.16f));
-            Fridge(r, new Vector3(-3.15f, 0, D - 0.42f), 0f, new Color(0.92f, 0.92f, 0.9f));
+            Fridge(P(r, "o1"), new Vector3(-4.3f, 0, D - 0.42f), 0f, new Color(0.86f, 0.18f, 0.16f));
+            Fridge(P(r, "o2"), new Vector3(-3.15f, 0, D - 0.42f), 0f, new Color(0.92f, 0.92f, 0.9f));
             var wood = new Color(0.5f, 0.3f, 0.18f);
-            Box(r, new Vector3(-4.7f, 0.55f, -0.8f), new Vector3(0.9f, 1.1f, 3.6f), wood, "Balcão");
-            Box(r, new Vector3(-4.65f, 1.13f, -0.8f), new Vector3(1.05f, 0.06f, 3.7f), new Color(0.86f, 0.82f, 0.72f));
-            Shelf(r, new Vector3(-W + 0.16f, 1.95f, -0.8f), 3.2f, wood);
-            Chalkboard(r, new Vector3(-1.3f, 1.9f, D - 0.03f), 1.5f, 0.95f);
-            Clock(r, new Vector3(-1.3f, 2.85f, D - 0.04f));
-            Tv(r, new Vector3(W - 0.1f, 2.45f, 1.6f));
-            Crates(r, new Vector3(4.55f, 0, -0.6f), 3, new[] { new Color(0.95f, 0.78f, 0.1f), new Color(0.88f, 0.26f, 0.2f) });
-            Crates(r, new Vector3(4.55f, 0, -1.35f), 2, new[] { new Color(0.88f, 0.26f, 0.2f), new Color(0.95f, 0.78f, 0.1f) });
-            StackedChairs(r, new Vector3(4.3f, 0, -3.8f), new Color(0.98f, 0.8f, 0.12f), 4);
-            Poster(r, Side.Direita, -2.6f, 1.9f, 0.7f, 1.0f, new Color(0.98f, 0.95f, 0.85f), new Color(0.2f, 0.55f, 0.3f));
-            TubeLight(r, new Vector3(-2.2f, H, 0.2f), true);
-            TubeLight(r, new Vector3(2.2f, H, -1.6f), true);
-            Fan(r, new Vector3(0, H, 0.6f), new Color(0.9f, 0.9f, 0.88f));
+            Box(P(r, "o3"), new Vector3(-4.7f, 0.55f, -0.8f), new Vector3(0.9f, 1.1f, 3.6f), wood, "Balcão");
+            Box(P(r, "o3"), new Vector3(-4.65f, 1.13f, -0.8f), new Vector3(1.05f, 0.06f, 3.7f), new Color(0.86f, 0.82f, 0.72f));
+            Shelf(P(r, "o4"), new Vector3(-W + 0.16f, 1.95f, -0.8f), 3.2f, wood);
+            Chalkboard(P(r, "o5"), new Vector3(-1.3f, 1.9f, D - 0.03f), 1.5f, 0.95f);
+            Clock(P(r, "o6"), new Vector3(-1.3f, 2.85f, D - 0.04f));
+            Tv(P(r, "o7"), new Vector3(W - 0.1f, 2.45f, 1.6f));
+            Crates(P(r, "o8"), new Vector3(4.55f, 0, -0.6f), 3, new[] { new Color(0.95f, 0.78f, 0.1f), new Color(0.88f, 0.26f, 0.2f) });
+            Crates(P(r, "o9"), new Vector3(4.55f, 0, -1.35f), 2, new[] { new Color(0.88f, 0.26f, 0.2f), new Color(0.95f, 0.78f, 0.1f) });
+            StackedChairs(P(r, "o10"), new Vector3(4.3f, 0, -3.8f), new Color(0.98f, 0.8f, 0.12f), 4);
+            Poster(P(r, "o11"), Side.Direita, -2.6f, 1.9f, 0.7f, 1.0f, new Color(0.98f, 0.95f, 0.85f), new Color(0.2f, 0.55f, 0.3f));
+            TubeLight(P(r, "o12"), new Vector3(-2.2f, H, 0.2f), true);
+            TubeLight(P(r, "o13"), new Vector3(2.2f, H, -1.6f), true);
+            Fan(P(r, "o14"), new Vector3(0, H, 0.6f), new Color(0.9f, 0.9f, 0.88f));
 
             var plastic = new Color(0.98f, 0.8f, 0.12f);
             return new EnvironmentLook { Table = plastic, TableEdge = new Color(0.88f, 0.66f, 0.08f), Chair = plastic };
@@ -150,36 +242,36 @@ namespace Cacheta.App
             Light(r, new Color(1f, 0.92f, 0.76f), 1.05f, new Vector3(50, 22, 0), new Color(0.48f, 0.46f, 0.5f));
 
             // As duas folhas do portão, abertas para dentro.
-            Box(r, new Vector3(-4.83f, 1.33f, D - 0.9f), new Vector3(0.06f, 2.62f, 1.75f), wood, "Folha do portão");
-            Box(r, new Vector3(-1.37f, 1.33f, D - 0.9f), new Vector3(0.06f, 2.62f, 1.75f), wood, "Folha do portão");
+            Box(P(r, "o19"), new Vector3(-4.83f, 1.33f, D - 0.9f), new Vector3(0.06f, 2.62f, 1.75f), wood, "Folha do portão");
+            Box(P(r, "o20"), new Vector3(-1.37f, 1.33f, D - 0.9f), new Vector3(0.06f, 2.62f, 1.75f), wood, "Folha do portão");
 
             // Lá fora: pracinha com árvores, banco e poste; casas ao fundo.
             Ground(r, new Color(0.47f, 0.64f, 0.32f));
-            Box(r, new Vector3(-3f, 0.005f, D + 6f), new Vector3(3.2f, 0.02f, 12f), new Color(0.8f, 0.74f, 0.62f), "Caminho");
-            Tree(r, new Vector3(-6.5f, 0, D + 5f), 2.6f, new Color(0.22f, 0.5f, 0.25f), 2.6f);
-            Tree(r, new Vector3(1.5f, 0, D + 8f), 2.2f, new Color(0.3f, 0.56f, 0.26f), 2.2f);
-            Bench(r, new Vector3(-0.8f, 0, D + 4.5f), new Color(0.5f, 0.32f, 0.2f));
-            LampPost(r, new Vector3(-4.8f, 0, D + 3.5f));
-            Facade(r, new Vector3(-8f, 0, D + 16f), 6f, 4.2f, new Color(0.96f, 0.92f, 0.78f), new Color(0.25f, 0.35f, 0.45f));
-            Facade(r, new Vector3(-1.5f, 0, D + 16f), 6.5f, 5.4f, new Color(0.62f, 0.8f, 0.72f), new Color(0.25f, 0.35f, 0.45f), floors: 2);
-            Facade(r, new Vector3(5f, 0, D + 16f), 6f, 4f, new Color(0.98f, 0.76f, 0.6f), new Color(0.25f, 0.35f, 0.45f));
+            Box(P(r, "o29"), new Vector3(-3f, 0.005f, D + 6f), new Vector3(3.2f, 0.02f, 12f), new Color(0.8f, 0.74f, 0.62f), "Caminho");
+            Tree(P(r, "o30"), new Vector3(-6.5f, 0, D + 5f), 2.6f, new Color(0.22f, 0.5f, 0.25f), 2.6f);
+            Tree(P(r, "o31"), new Vector3(1.5f, 0, D + 8f), 2.2f, new Color(0.3f, 0.56f, 0.26f), 2.2f);
+            Bench(P(r, "o32"), new Vector3(-0.8f, 0, D + 4.5f), new Color(0.5f, 0.32f, 0.2f));
+            LampPost(P(r, "o33"), new Vector3(-4.8f, 0, D + 3.5f));
+            Facade(P(r, "o34"), new Vector3(-8f, 0, D + 16f), 6f, 4.2f, new Color(0.96f, 0.92f, 0.78f), new Color(0.25f, 0.35f, 0.45f));
+            Facade(P(r, "o34"), new Vector3(-1.5f, 0, D + 16f), 6.5f, 5.4f, new Color(0.62f, 0.8f, 0.72f), new Color(0.25f, 0.35f, 0.45f), floors: 2);
+            Facade(P(r, "o34"), new Vector3(5f, 0, D + 16f), 6f, 4f, new Color(0.98f, 0.76f, 0.6f), new Color(0.25f, 0.35f, 0.45f));
             Box(r, new Vector3(W + 6f, -0.05f, 0), new Vector3(12f, 0.1f, 20f), new Color(0.47f, 0.64f, 0.32f), "Gramado lateral");
-            Tree(r, new Vector3(W + 3.5f, 0, 0.8f), 2.4f, new Color(0.24f, 0.52f, 0.25f), 2.4f);
+            Tree(P(r, "o35"), new Vector3(W + 3.5f, 0, 0.8f), 2.4f, new Color(0.24f, 0.52f, 0.25f), 2.4f);
 
             // Dentro: painel do bingo, globo de sorteio, mesas compridas, cadeiras empilhadas, mural de recados.
-            BingoBoard(r, new Vector3(2.3f, 2.05f, D - 0.04f));
-            Box(r, new Vector3(3.7f, 0.4f, 2.8f), new Vector3(0.9f, 0.8f, 0.6f), wood, "Mesinha do globo");
-            Palette.Prim(PrimitiveType.Sphere, r, new Vector3(3.7f, 1.15f, 2.8f), Vector3.one * 0.55f, new Color(0.95f, 0.78f, 0.32f), "Globo do bingo");
-            Box(r, new Vector3(3.7f, 0.86f, 2.8f), new Vector3(0.3f, 0.12f, 0.3f), new Color(0.3f, 0.3f, 0.32f));
-            Box(r, new Vector3(4.02f, 1.15f, 2.8f), new Vector3(0.12f, 0.04f, 0.04f), new Color(0.3f, 0.3f, 0.32f), "Manivela");
-            FoldingTable(r, new Vector3(4.55f, 0, -2.6f), new Vector3(0.8f, 0.74f, 2.6f), new Color(0.96f, 0.96f, 0.94f));
-            Palette.Prim(PrimitiveType.Cylinder, r, new Vector3(4.55f, 0.95f, -3.4f), new Vector3(0.22f, 0.2f, 0.22f), new Color(0.75f, 0.76f, 0.78f), "Garrafa de café");
-            StackedChairs(r, new Vector3(-4.4f, 0, -3.8f), wood, 5);
-            Board(r, Side.Esquerda, -1.6f, 1.75f, 2.2f, 1.1f, new Color(0.78f, 0.6f, 0.4f),
+            BingoBoard(P(r, "o21"), new Vector3(2.3f, 2.05f, D - 0.04f));
+            Box(P(r, "o22"), new Vector3(3.7f, 0.4f, 2.8f), new Vector3(0.9f, 0.8f, 0.6f), wood, "Mesinha do globo");
+            Palette.Prim(PrimitiveType.Sphere, P(r, "o22"), new Vector3(3.7f, 1.15f, 2.8f), Vector3.one * 0.55f, new Color(0.95f, 0.78f, 0.32f), "Globo do bingo");
+            Box(P(r, "o22"), new Vector3(3.7f, 0.86f, 2.8f), new Vector3(0.3f, 0.12f, 0.3f), new Color(0.3f, 0.3f, 0.32f));
+            Box(P(r, "o22"), new Vector3(4.02f, 1.15f, 2.8f), new Vector3(0.12f, 0.04f, 0.04f), new Color(0.3f, 0.3f, 0.32f), "Manivela");
+            FoldingTable(P(r, "o23"), new Vector3(4.55f, 0, -2.6f), new Vector3(0.8f, 0.74f, 2.6f), new Color(0.96f, 0.96f, 0.94f));
+            Palette.Prim(PrimitiveType.Cylinder, P(r, "o23"), new Vector3(4.55f, 0.95f, -3.4f), new Vector3(0.22f, 0.2f, 0.22f), new Color(0.75f, 0.76f, 0.78f), "Garrafa de café");
+            StackedChairs(P(r, "o24"), new Vector3(-4.4f, 0, -3.8f), wood, 5);
+            Board(P(r, "o25"), Side.Esquerda, -1.6f, 1.75f, 2.2f, 1.1f, new Color(0.78f, 0.6f, 0.4f),
                   new[] { new Color(0.98f, 0.95f, 0.6f), new Color(0.6f, 0.85f, 0.98f), new Color(0.98f, 0.7f, 0.75f), Color.white });
-            Fan(r, new Vector3(-2.2f, H, 0.2f), Color.white);
-            Fan(r, new Vector3(2.2f, H, -2.4f), Color.white);
-            TubeLight(r, new Vector3(0, H, -3.5f), true);
+            Fan(P(r, "o26"), new Vector3(-2.2f, H, 0.2f), Color.white);
+            Fan(P(r, "o27"), new Vector3(2.2f, H, -2.4f), Color.white);
+            TubeLight(P(r, "o28"), new Vector3(0, H, -3.5f), true);
 
             return new EnvironmentLook { Table = new Color(0.93f, 0.88f, 0.76f), TableEdge = new Color(0.6f, 0.45f, 0.3f), Chair = wood };
         }
@@ -201,41 +293,41 @@ namespace Cacheta.App
             Light(r, new Color(1f, 0.78f, 0.6f), 1.0f, new Vector3(44, -18, 0), new Color(0.44f, 0.38f, 0.48f));
 
             // Lá fora: entrada de carro, rua e casas com as janelas acesas.
-            Box(r, new Vector3(0, 0.005f, D + 2.5f), new Vector3(4.8f, 0.02f, 5f), new Color(0.7f, 0.7f, 0.68f), "Entrada");
-            Street(r, new Color(0.72f, 0.7f, 0.66f), 5f);
+            Box(P(r, "o48"), new Vector3(0, 0.005f, D + 2.5f), new Vector3(4.8f, 0.02f, 5f), new Color(0.7f, 0.7f, 0.68f), "Entrada");
+            Street(P(r, "o49"), new Color(0.72f, 0.7f, 0.66f), 5f);
             Color[] houses = { new Color(0.72f, 0.62f, 0.8f), new Color(0.95f, 0.85f, 0.65f), new Color(0.6f, 0.78f, 0.82f), new Color(0.9f, 0.66f, 0.55f) };
             for (int i = 0; i < houses.Length; i++)
-                Facade(r, new Vector3(-9f + i * 6f, 0, D + 15f), 5.6f, 3.8f + (i % 2) * 1.4f, houses[i], new Color(1f, 0.86f, 0.5f),
+                Facade(P(r, "o50"), new Vector3(-9f + i * 6f, 0, D + 15f), 5.6f, 3.8f + (i % 2) * 1.4f, houses[i], new Color(1f, 0.86f, 0.5f),
                        floors: 1 + i % 2, lit: true);
-            Tree(r, new Vector3(-4f, 0, D + 3f), 2.2f, new Color(0.26f, 0.42f, 0.26f), 2f);
-            Hoop(r, new Vector3(3.4f, 0, D + 2.6f));
+            Tree(P(r, "o51"), new Vector3(-4f, 0, D + 3f), 2.2f, new Color(0.26f, 0.42f, 0.26f), 2f);
+            Hoop(P(r, "o52"), new Vector3(3.4f, 0, D + 2.6f));
 
             // Dentro: estante de jogos de tabuleiro, fliperama, quadro de ferramentas, pôsteres, pufes e fita de LED.
             var metal = new Color(0.35f, 0.37f, 0.4f);
-            Bookcase(r, new Vector3(-W + 0.26f, 0, -0.6f), 4.4f, metal, new[]
+            Bookcase(P(r, "o36"), new Vector3(-W + 0.26f, 0, -0.6f), 4.4f, metal, new[]
             {
                 new Color(0.9f, 0.3f, 0.3f), new Color(0.3f, 0.55f, 0.9f), new Color(0.98f, 0.8f, 0.2f), new Color(0.4f, 0.75f, 0.4f),
                 new Color(0.7f, 0.4f, 0.8f), new Color(0.98f, 0.55f, 0.25f), new Color(0.9f, 0.9f, 0.9f), new Color(0.2f, 0.2f, 0.25f),
             });
-            Arcade(r, new Vector3(4.45f, 0, 3.7f), new Color(0.42f, 0.22f, 0.6f));
-            Board(r, Side.Direita, -1.2f, 1.75f, 2.6f, 1.2f, new Color(0.78f, 0.62f, 0.42f),
+            Arcade(P(r, "o37"), new Vector3(4.45f, 0, 3.7f), new Color(0.42f, 0.22f, 0.6f));
+            Board(P(r, "o38"), Side.Direita, -1.2f, 1.75f, 2.6f, 1.2f, new Color(0.78f, 0.62f, 0.42f),
                   new[] { new Color(0.85f, 0.25f, 0.25f), new Color(0.3f, 0.3f, 0.32f), new Color(0.98f, 0.8f, 0.2f), new Color(0.3f, 0.55f, 0.9f) });
-            Box(r, new Vector3(W - 0.4f, 0.85f, -1.2f), new Vector3(0.75f, 0.06f, 2.6f), new Color(0.6f, 0.42f, 0.26f), "Bancada");
-            Box(r, new Vector3(W - 0.4f, 0.42f, -1.2f), new Vector3(0.7f, 0.84f, 2.5f), metal);
-            Poster(r, Side.Fundo, -3.8f, 1.85f, 1.0f, 1.4f, new Color(0.15f, 0.15f, 0.3f), new Color(0.98f, 0.45f, 0.7f));
-            Poster(r, Side.Fundo, 3.6f, 1.85f, 1.0f, 1.4f, new Color(0.98f, 0.9f, 0.6f), new Color(0.3f, 0.6f, 0.85f));
-            Box(r, new Vector3(-4.5f, 0.45f, D - 0.4f), new Vector3(0.7f, 0.9f, 0.65f), new Color(0.9f, 0.92f, 0.95f), "Frigobar");
-            Palette.Prim(PrimitiveType.Sphere, r, new Vector3(3.4f, 0.32f, -3.6f), new Vector3(1.1f, 0.65f, 1.1f), new Color(0.98f, 0.45f, 0.6f), "Pufe");
-            Palette.Prim(PrimitiveType.Sphere, r, new Vector3(4.4f, 0.32f, -2.9f), new Vector3(1.0f, 0.6f, 1.0f), new Color(0.3f, 0.7f, 0.75f), "Pufe");
-            Palette.Prim(PrimitiveType.Cylinder, r, new Vector3(0, 0.006f, 0), new Vector3(4.6f, 0.006f, 4.6f), new Color(0.3f, 0.25f, 0.42f), "Tapete");
+            Box(P(r, "o39"), new Vector3(W - 0.4f, 0.85f, -1.2f), new Vector3(0.75f, 0.06f, 2.6f), new Color(0.6f, 0.42f, 0.26f), "Bancada");
+            Box(P(r, "o39"), new Vector3(W - 0.4f, 0.42f, -1.2f), new Vector3(0.7f, 0.84f, 2.5f), metal);
+            Poster(P(r, "o40"), Side.Fundo, -3.8f, 1.85f, 1.0f, 1.4f, new Color(0.15f, 0.15f, 0.3f), new Color(0.98f, 0.45f, 0.7f));
+            Poster(P(r, "o41"), Side.Fundo, 3.6f, 1.85f, 1.0f, 1.4f, new Color(0.98f, 0.9f, 0.6f), new Color(0.3f, 0.6f, 0.85f));
+            Box(P(r, "o42"), new Vector3(-4.5f, 0.45f, D - 0.4f), new Vector3(0.7f, 0.9f, 0.65f), new Color(0.9f, 0.92f, 0.95f), "Frigobar");
+            Palette.Prim(PrimitiveType.Sphere, P(r, "o43"), new Vector3(3.4f, 0.32f, -3.6f), new Vector3(1.1f, 0.65f, 1.1f), new Color(0.98f, 0.45f, 0.6f), "Pufe");
+            Palette.Prim(PrimitiveType.Sphere, P(r, "o44"), new Vector3(4.4f, 0.32f, -2.9f), new Vector3(1.0f, 0.6f, 1.0f), new Color(0.3f, 0.7f, 0.75f), "Pufe");
+            Palette.Prim(PrimitiveType.Cylinder, P(r, "o45"), new Vector3(0, 0.006f, 0), new Vector3(4.6f, 0.006f, 4.6f), new Color(0.3f, 0.25f, 0.42f), "Tapete");
             var led = new Color(0.72f, 0.35f, 1f);
             Glow(r, new Vector3(0, H - 0.04f, D - 0.05f), new Vector3(2 * W, 0.04f, 0.04f), led, "Fita de LED");
             Glow(r, new Vector3(-W + 0.05f, H - 0.04f, (F + D) / 2), new Vector3(0.04f, 0.04f, D - F), led);
             Glow(r, new Vector3(W - 0.05f, H - 0.04f, (F + D) / 2), new Vector3(0.04f, 0.04f, D - F), led);
             for (int i = -2; i <= 2; i++)
                 NoShadow(Box(r, new Vector3(i * 2.2f, H - 0.12f, (F + D) / 2), new Vector3(0.14f, 0.24f, D - F), new Color(0.6f, 0.45f, 0.3f), "Viga"));
-            TubeLight(r, new Vector3(-2.2f, H - 0.24f, -0.5f), false);
-            TubeLight(r, new Vector3(2.2f, H - 0.24f, -0.5f), false);
+            TubeLight(P(r, "o46"), new Vector3(-2.2f, H - 0.24f, -0.5f), false);
+            TubeLight(P(r, "o47"), new Vector3(2.2f, H - 0.24f, -0.5f), false);
 
             return new EnvironmentLook { Table = new Color(0.42f, 0.25f, 0.62f), TableEdge = new Color(0.15f, 0.12f, 0.18f), Chair = new Color(0.2f, 0.2f, 0.24f) };
         }
@@ -264,34 +356,34 @@ namespace Cacheta.App
             // Lá fora: gramado, mangueira, varal, casinha de cachorro, muro com primavera e a caixa d'água do vizinho.
             Ground(r, new Color(0.45f, 0.62f, 0.3f));
             Box(r, new Vector3(W + 7f, -0.05f, 0), new Vector3(14f, 0.1f, 20f), new Color(0.45f, 0.62f, 0.3f), "Gramado lateral");
-            Tree(r, new Vector3(2.8f, 0, D + 5.2f), 2.8f, new Color(0.2f, 0.45f, 0.2f), 3.4f, trunk: 0.45f);
+            Tree(P(r, "o61"), new Vector3(2.8f, 0, D + 5.2f), 2.8f, new Color(0.2f, 0.45f, 0.2f), 3.4f, trunk: 0.45f);
             for (int i = 0; i < 6; i++)
-                Palette.Prim(PrimitiveType.Sphere, r, new Vector3(1.6f + i * 0.5f, 2.9f + (i % 3) * 0.35f, D + 3.6f + (i % 2) * 0.4f),
+                Palette.Prim(PrimitiveType.Sphere, P(r, "o61"), new Vector3(1.6f + i * 0.5f, 2.9f + (i % 3) * 0.35f, D + 3.6f + (i % 2) * 0.4f),
                              Vector3.one * 0.16f, new Color(0.98f, 0.7f, 0.2f), "Manga");
             var wall = new Color(0.92f, 0.86f, 0.72f);
-            Box(r, new Vector3(0, 1.2f, D + 10f), new Vector3(24f, 2.4f, 0.25f), wall, "Muro");
-            Box(r, new Vector3(W + 8f, 1.2f, 0), new Vector3(0.25f, 2.4f, 20f), wall, "Muro lateral");
+            Box(P(r, "o62"), new Vector3(0, 1.2f, D + 10f), new Vector3(24f, 2.4f, 0.25f), wall, "Muro");
+            Box(P(r, "o63"), new Vector3(W + 8f, 1.2f, 0), new Vector3(0.25f, 2.4f, 20f), wall, "Muro lateral");
             for (int i = 0; i < 9; i++)
-                Palette.Prim(PrimitiveType.Sphere, r, new Vector3(-9f + i * 1.1f, 2.5f + (i % 2) * 0.15f, D + 9.9f),
+                Palette.Prim(PrimitiveType.Sphere, P(r, "o62"), new Vector3(-9f + i * 1.1f, 2.5f + (i % 2) * 0.15f, D + 9.9f),
                              new Vector3(1.2f, 0.7f, 0.6f), i % 3 == 0 ? new Color(0.3f, 0.55f, 0.28f) : new Color(0.92f, 0.32f, 0.6f), "Primavera");
-            Clothesline(r, new Vector3(-6f, 0, D + 4.5f), new Vector3(-1.5f, 0, D + 6f));
-            DogHouse(r, new Vector3(6.4f, 0, D + 7.6f));
-            Box(r, new Vector3(-3f, 3.2f, D + 14f), new Vector3(7f, 1.6f, 5f), new Color(0.75f, 0.38f, 0.28f), "Telhado do vizinho");
-            Box(r, new Vector3(-3f, 1.2f, D + 14f), new Vector3(6.6f, 2.4f, 4.6f), new Color(0.96f, 0.9f, 0.82f));
-            Palette.Prim(PrimitiveType.Cylinder, r, new Vector3(-1.2f, 4.5f, D + 14f), new Vector3(1.3f, 0.5f, 1.3f), new Color(0.3f, 0.55f, 0.85f), "Caixa d'água");
+            Clothesline(P(r, "o64"), new Vector3(-6f, 0, D + 4.5f), new Vector3(-1.5f, 0, D + 6f));
+            DogHouse(P(r, "o65"), new Vector3(6.4f, 0, D + 7.6f));
+            Box(P(r, "o66"), new Vector3(-3f, 3.2f, D + 14f), new Vector3(7f, 1.6f, 5f), new Color(0.75f, 0.38f, 0.28f), "Telhado do vizinho");
+            Box(P(r, "o66"), new Vector3(-3f, 1.2f, D + 14f), new Vector3(6.6f, 2.4f, 4.6f), new Color(0.96f, 0.9f, 0.82f));
+            Palette.Prim(PrimitiveType.Cylinder, P(r, "o66"), new Vector3(-1.2f, 4.5f, D + 14f), new Vector3(1.3f, 0.5f, 1.3f), new Color(0.3f, 0.55f, 0.85f), "Caixa d'água");
 
             // Dentro: churrasqueira de tijolo com chaminé, pia, caixa térmica, cadeiras empilhadas, lâmpadas penduradas.
-            Barbecue(r, new Vector3(-3.3f, 0, D - 0.42f), brick);
-            Box(r, new Vector3(-4.75f, 0.45f, 1.7f), new Vector3(0.8f, 0.9f, 1.5f), new Color(0.9f, 0.9f, 0.88f), "Pia");
-            Box(r, new Vector3(-4.75f, 0.92f, 1.7f), new Vector3(0.86f, 0.05f, 1.56f), new Color(0.6f, 0.6f, 0.62f));
-            Box(r, new Vector3(-5.0f, 1.12f, 1.7f), new Vector3(0.06f, 0.35f, 0.06f), new Color(0.7f, 0.7f, 0.72f), "Torneira");
-            Box(r, new Vector3(-4.4f, 0.26f, -1.6f), new Vector3(0.9f, 0.52f, 0.6f), new Color(0.97f, 0.97f, 0.95f), "Caixa térmica");
-            Box(r, new Vector3(-4.4f, 0.55f, -1.6f), new Vector3(0.94f, 0.08f, 0.64f), new Color(0.25f, 0.5f, 0.85f));
-            StackedChairs(r, new Vector3(-4.3f, 0, -3.9f), Color.white, 4);
-            Box(r, new Vector3(W - 0.45f, 0.4f, -4.2f), new Vector3(0.5f, 0.8f, 0.5f), new Color(0.15f, 0.15f, 0.17f), "Caixa de som");
-            Palette.Prim(PrimitiveType.Cylinder, r, new Vector3(W - 0.24f, 0.55f, -4.2f), new Vector3(0.3f, 0.01f, 0.3f), new Color(0.35f, 0.35f, 0.38f))
+            Barbecue(P(r, "o53"), new Vector3(-3.3f, 0, D - 0.42f), brick);
+            Box(P(r, "o54"), new Vector3(-4.75f, 0.45f, 1.7f), new Vector3(0.8f, 0.9f, 1.5f), new Color(0.9f, 0.9f, 0.88f), "Pia");
+            Box(P(r, "o54"), new Vector3(-4.75f, 0.92f, 1.7f), new Vector3(0.86f, 0.05f, 1.56f), new Color(0.6f, 0.6f, 0.62f));
+            Box(P(r, "o54"), new Vector3(-5.0f, 1.12f, 1.7f), new Vector3(0.06f, 0.35f, 0.06f), new Color(0.7f, 0.7f, 0.72f), "Torneira");
+            Box(P(r, "o55"), new Vector3(-4.4f, 0.26f, -1.6f), new Vector3(0.9f, 0.52f, 0.6f), new Color(0.97f, 0.97f, 0.95f), "Caixa térmica");
+            Box(P(r, "o55"), new Vector3(-4.4f, 0.55f, -1.6f), new Vector3(0.94f, 0.08f, 0.64f), new Color(0.25f, 0.5f, 0.85f));
+            StackedChairs(P(r, "o56"), new Vector3(-4.3f, 0, -3.9f), Color.white, 4);
+            Box(P(r, "o57"), new Vector3(W - 0.45f, 0.4f, -4.2f), new Vector3(0.5f, 0.8f, 0.5f), new Color(0.15f, 0.15f, 0.17f), "Caixa de som");
+            Palette.Prim(PrimitiveType.Cylinder, P(r, "o57"), new Vector3(W - 0.24f, 0.55f, -4.2f), new Vector3(0.3f, 0.01f, 0.3f), new Color(0.35f, 0.35f, 0.38f))
                 .transform.localRotation = Quaternion.Euler(0, 0, 90);
-            for (int i = 0; i < 3; i++) Bulb(r, new Vector3(-2.4f + i * 2.4f, H, 0.4f - (i % 2) * 1.6f), 0.7f);
+            for (int i = 0; i < 3; i++) Bulb(P(r, "o" + (58 + i)), new Vector3(-2.4f + i * 2.4f, H, 0.4f - (i % 2) * 1.6f), 0.7f);
 
             var woodTable = new Color(0.62f, 0.42f, 0.26f);
             return new EnvironmentLook { Table = woodTable, TableEdge = new Color(0.45f, 0.3f, 0.18f), Chair = new Color(0.55f, 0.36f, 0.22f) };
@@ -320,30 +412,30 @@ namespace Cacheta.App
 
             // Lá fora: areia, espuma, mar até o horizonte, coqueiros, guarda-sol, barquinho e uma ilha.
             var sand = new Color(0.94f, 0.86f, 0.66f);
-            Box(r, new Vector3(0, -0.05f, D + 6f), new Vector3(80f, 0.1f, 12f), sand, "Areia");
+            Box(P(r, "o77"), new Vector3(0, -0.05f, D + 6f), new Vector3(80f, 0.1f, 12f), sand, "Areia");
             Box(r, new Vector3(W + 10f, -0.05f, -1f), new Vector3(20f, 0.1f, 16f), sand, "Areia lateral");
             Box(r, new Vector3(0, -0.06f, D + 12.6f), new Vector3(80f, 0.1f, 1.2f), new Color(0.68f, 0.88f, 0.9f), "Espuma");
-            Box(r, new Vector3(0, -0.08f, D + 113f), new Vector3(400f, 0.1f, 200f), new Color(0.16f, 0.52f, 0.76f), "Mar");
+            Box(P(r, "o78"), new Vector3(0, -0.08f, D + 113f), new Vector3(400f, 0.1f, 200f), new Color(0.16f, 0.52f, 0.76f), "Mar");
             Palette.Prim(PrimitiveType.Sphere, r, new Vector3(-38f, -2f, D + 150f), new Vector3(40f, 12f, 16f), new Color(0.3f, 0.55f, 0.4f), "Ilha");
-            Palm(r, new Vector3(-6.4f, 0, D + 4f), 4.6f, 8f);
-            Palm(r, new Vector3(7f, 0, D + 6f), 5.2f, -10f);
-            Palm(r, new Vector3(W + 3.5f, 0, -1.5f), 4.2f, 6f);
-            Umbrella(r, new Vector3(2.2f, 0, D + 6.5f), new Color(0.98f, 0.4f, 0.3f), Color.white);
+            Palm(P(r, "o79"), new Vector3(-6.4f, 0, D + 4f), 4.6f, 8f);
+            Palm(P(r, "o80"), new Vector3(7f, 0, D + 6f), 5.2f, -10f);
+            Palm(P(r, "o81"), new Vector3(W + 3.5f, 0, -1.5f), 4.2f, 6f);
+            Umbrella(P(r, "o82"), new Vector3(2.2f, 0, D + 6.5f), new Color(0.98f, 0.4f, 0.3f), Color.white);
             Box(r, new Vector3(-12f, 0.1f, D + 34f), new Vector3(2.4f, 0.5f, 0.9f), Color.white, "Barquinho");
             Box(r, new Vector3(-12f, 0.75f, D + 34f), new Vector3(0.05f, 1.3f, 0.05f), new Color(0.6f, 0.45f, 0.3f));
             Box(r, new Vector3(-11.6f, 0.9f, D + 34f), new Vector3(0.7f, 0.9f, 0.03f), new Color(0.98f, 0.85f, 0.3f));
 
             // Dentro: carrinho de coco, balcão com banquinhos, freezer, pranchas e luminárias de palha.
-            CoconutCart(r, new Vector3(-3.7f, 0, 2.9f));
+            CoconutCart(P(r, "o67"), new Vector3(-3.7f, 0, 2.9f));
             var blue = new Color(0.26f, 0.56f, 0.76f);
-            Box(r, new Vector3(-4.7f, 0.55f, -1.2f), new Vector3(0.9f, 1.1f, 3.4f), blue, "Balcão");
-            Box(r, new Vector3(-4.65f, 1.13f, -1.2f), new Vector3(1.05f, 0.06f, 3.5f), new Color(0.75f, 0.58f, 0.38f));
-            for (int i = 0; i < 3; i++) Stool(r, new Vector3(-3.95f, 0, -2.4f + i * 1.1f), new Color(0.98f, 0.55f, 0.3f));
-            Box(r, new Vector3(-4.4f, 0.45f, -4.1f), new Vector3(0.9f, 0.9f, 1.3f), new Color(0.97f, 0.97f, 0.97f), "Freezer");
-            Surfboard(r, new Vector3(4.8f, 0, -4.4f), new Color(0.98f, 0.8f, 0.25f), -8f);
-            Surfboard(r, new Vector3(4.8f, 0, -5.1f), new Color(0.35f, 0.75f, 0.7f), 6f);
+            Box(P(r, "o68"), new Vector3(-4.7f, 0.55f, -1.2f), new Vector3(0.9f, 1.1f, 3.4f), blue, "Balcão");
+            Box(P(r, "o68"), new Vector3(-4.65f, 1.13f, -1.2f), new Vector3(1.05f, 0.06f, 3.5f), new Color(0.75f, 0.58f, 0.38f));
+            for (int i = 0; i < 3; i++) Stool(P(r, "o" + (69 + i)), new Vector3(-3.95f, 0, -2.4f + i * 1.1f), new Color(0.98f, 0.55f, 0.3f));
+            Box(P(r, "o72"), new Vector3(-4.4f, 0.45f, -4.1f), new Vector3(0.9f, 0.9f, 1.3f), new Color(0.97f, 0.97f, 0.97f), "Freezer");
+            Surfboard(P(r, "o73"), new Vector3(4.8f, 0, -4.4f), new Color(0.98f, 0.8f, 0.25f), -8f);
+            Surfboard(P(r, "o74"), new Vector3(4.8f, 0, -5.1f), new Color(0.35f, 0.75f, 0.7f), 6f);
             NoShadow(Box(r, new Vector3(0, H - 0.14f, D - 0.1f), new Vector3(2 * W, 0.28f, 0.2f), new Color(0.62f, 0.44f, 0.26f), "Viga do fundo"));
-            for (int i = -1; i <= 1; i += 2) WovenLamp(r, new Vector3(i * 2.2f, H, -0.6f));
+            for (int i = -1; i <= 1; i += 2) WovenLamp(P(r, "o" + (i < 0 ? 75 : 76)), new Vector3(i * 2.2f, H, -0.6f));
 
             return new EnvironmentLook { Table = new Color(0.97f, 0.97f, 0.97f), TableEdge = new Color(0.85f, 0.85f, 0.85f), Chair = new Color(0.2f, 0.45f, 0.8f) };
         }
@@ -371,30 +463,30 @@ namespace Cacheta.App
             // Lá fora: gramado com caminhos, o ipê amarelo, outra árvore, bancos e o prédio do outro lado.
             Ground(r, new Color(0.46f, 0.64f, 0.3f));
             var stone = new Color(0.82f, 0.8f, 0.74f);
-            Box(r, new Vector3(0, 0.005f, D + 7f), new Vector3(2.2f, 0.02f, 14f), stone, "Caminho");
-            Box(r, new Vector3(0, 0.005f, D + 7f), new Vector3(24f, 0.02f, 2f), stone, "Caminho");
-            Tree(r, new Vector3(3.6f, 0, D + 4.5f), 2.6f, new Color(0.99f, 0.82f, 0.14f), 3.2f, trunk: 0.32f);
-            Palette.Prim(PrimitiveType.Cylinder, r, new Vector3(3.6f, 0.012f, D + 4.5f), new Vector3(5f, 0.008f, 5f), new Color(0.96f, 0.84f, 0.3f), "Flores caídas");
-            Tree(r, new Vector3(-6.5f, 0, D + 8f), 2.6f, new Color(0.24f, 0.5f, 0.26f), 2.8f);
-            Bench(r, new Vector3(-3f, 0, D + 4.2f), new Color(0.6f, 0.6f, 0.58f));
-            Bench(r, new Vector3(-3f, 0, D + 9.6f), new Color(0.6f, 0.6f, 0.58f));
-            Facade(r, new Vector3(0, 0, D + 16f), 30f, 9.6f, new Color(0.95f, 0.94f, 0.9f), new Color(0.35f, 0.55f, 0.75f), floors: 3);
+            Box(P(r, "o93"), new Vector3(0, 0.005f, D + 7f), new Vector3(2.2f, 0.02f, 14f), stone, "Caminho");
+            Box(P(r, "o93"), new Vector3(0, 0.005f, D + 7f), new Vector3(24f, 0.02f, 2f), stone, "Caminho");
+            Tree(P(r, "o91"), new Vector3(3.6f, 0, D + 4.5f), 2.6f, new Color(0.99f, 0.82f, 0.14f), 3.2f, trunk: 0.32f);
+            Palette.Prim(PrimitiveType.Cylinder, P(r, "o91"), new Vector3(3.6f, 0.012f, D + 4.5f), new Vector3(5f, 0.008f, 5f), new Color(0.96f, 0.84f, 0.3f), "Flores caídas");
+            Tree(P(r, "o92"), new Vector3(-6.5f, 0, D + 8f), 2.6f, new Color(0.24f, 0.5f, 0.26f), 2.8f);
+            Bench(P(r, "o94"), new Vector3(-3f, 0, D + 4.2f), new Color(0.6f, 0.6f, 0.58f));
+            Bench(P(r, "o95"), new Vector3(-3f, 0, D + 9.6f), new Color(0.6f, 0.6f, 0.58f));
+            Facade(P(r, "o96"), new Vector3(0, 0, D + 16f), 30f, 9.6f, new Color(0.95f, 0.94f, 0.9f), new Color(0.35f, 0.55f, 0.75f), floors: 3);
 
             // Dentro: mural de avisos, máquina de lanches, lixeiras de reciclagem, banco e cavalete com cartaz.
-            Board(r, Side.Esquerda, -0.4f, 1.8f, 2.8f, 1.2f, new Color(0.78f, 0.6f, 0.4f),
+            Board(P(r, "o83"), Side.Esquerda, -0.4f, 1.8f, 2.8f, 1.2f, new Color(0.78f, 0.6f, 0.4f),
                   new[] { new Color(0.98f, 0.95f, 0.6f), new Color(0.6f, 0.85f, 0.98f), new Color(0.98f, 0.7f, 0.75f), new Color(0.7f, 0.95f, 0.7f) });
-            Board(r, Side.Esquerda, -4.2f, 1.8f, 1.8f, 1.2f, new Color(0.25f, 0.4f, 0.3f), new[] { Color.white, new Color(0.98f, 0.95f, 0.6f) });
-            VendingMachine(r, new Vector3(W - 0.45f, 0, 3.6f));
+            Board(P(r, "o84"), Side.Esquerda, -4.2f, 1.8f, 1.8f, 1.2f, new Color(0.25f, 0.4f, 0.3f), new[] { Color.white, new Color(0.98f, 0.95f, 0.6f) });
+            VendingMachine(P(r, "o85"), new Vector3(W - 0.45f, 0, 3.6f));
             Color[] bins = { new Color(0.95f, 0.8f, 0.15f), new Color(0.25f, 0.45f, 0.85f), new Color(0.85f, 0.25f, 0.2f), new Color(0.3f, 0.65f, 0.3f) };
             for (int i = 0; i < bins.Length; i++)
-                Palette.Prim(PrimitiveType.Cylinder, r, new Vector3(W - 0.35f, 0.4f, -0.4f - i * 0.6f), new Vector3(0.45f, 0.4f, 0.45f), bins[i], "Lixeira");
-            Bench(r, new Vector3(W - 0.5f, 0, -4.2f), new Color(0.55f, 0.36f, 0.22f), alongZ: true);
-            Box(r, new Vector3(-3.6f, 0.9f, 3.4f), new Vector3(0.9f, 1.2f, 0.05f), new Color(0.98f, 0.98f, 0.96f), "Cartaz");
-            Box(r, new Vector3(-3.6f, 1.15f, 3.37f), new Vector3(0.6f, 0.4f, 0.02f), new Color(0.2f, 0.5f, 0.35f));
-            Box(r, new Vector3(-3.6f, 0.4f, 3.5f), new Vector3(0.06f, 0.8f, 0.3f), new Color(0.55f, 0.36f, 0.22f), "Cavalete");
+                Palette.Prim(PrimitiveType.Cylinder, P(r, "o86"), new Vector3(W - 0.35f, 0.4f, -0.4f - i * 0.6f), new Vector3(0.45f, 0.4f, 0.45f), bins[i], "Lixeira");
+            Bench(P(r, "o87"), new Vector3(W - 0.5f, 0, -4.2f), new Color(0.55f, 0.36f, 0.22f), alongZ: true);
+            Box(P(r, "o88"), new Vector3(-3.6f, 0.9f, 3.4f), new Vector3(0.9f, 1.2f, 0.05f), new Color(0.98f, 0.98f, 0.96f), "Cartaz");
+            Box(P(r, "o88"), new Vector3(-3.6f, 1.15f, 3.37f), new Vector3(0.6f, 0.4f, 0.02f), new Color(0.2f, 0.5f, 0.35f));
+            Box(P(r, "o88"), new Vector3(-3.6f, 0.4f, 3.5f), new Vector3(0.06f, 0.8f, 0.3f), new Color(0.55f, 0.36f, 0.22f), "Cavalete");
             for (int i = -2; i <= 2; i++)
                 NoShadow(Box(r, new Vector3(i * 2.4f, H - 0.15f, (F + D) / 2), new Vector3(0.3f, 0.3f, D - F), new Color(0.86f, 0.86f, 0.84f), "Viga"));
-            for (int i = -1; i <= 1; i += 2) DomeLight(r, new Vector3(i * 1.2f, H, -0.8f));
+            for (int i = -1; i <= 1; i += 2) DomeLight(P(r, "o" + (i < 0 ? 89 : 90)), new Vector3(i * 1.2f, H, -0.8f));
 
             return new EnvironmentLook { Table = new Color(0.74f, 0.74f, 0.72f), TableEdge = new Color(0.58f, 0.58f, 0.56f), Chair = new Color(0.2f, 0.5f, 0.32f) };
         }
@@ -428,21 +520,21 @@ namespace Cacheta.App
                 float top = -4f + (float)rng.NextDouble() * 14f;
                 float bw = 2f + (float)rng.NextDouble() * 2.5f;
                 var shade = Color.Lerp(new Color(0.1f, 0.12f, 0.24f), new Color(0.18f, 0.2f, 0.34f), (float)rng.NextDouble());
-                Tower(r, new Vector3(bx, top, bz), bw, top + 40f, shade, rng);
+                Tower(P(r, "o105"), new Vector3(bx, top, bz), bw, top + 40f, shade, rng);
             }
             Glow(r, new Vector3(16f, 22f, D + 90f), Vector3.one * 5f, new Color(0.98f, 0.96f, 0.85f), "Lua", PrimitiveType.Sphere);
 
             // Dentro: roleta, caça-níqueis, estátua do tigre dourado, bar, fichas, dado de ouro e lustre.
-            Roulette(r, new Vector3(-3.0f, 0, 3.35f));
-            for (int i = 0; i < 4; i++) SlotMachine(r, new Vector3(W - 0.42f, 0, -1.0f + i * 0.95f), i);
-            TigerStatue(r, new Vector3(4.15f, 0, 3.75f));
+            Roulette(P(r, "o97"), new Vector3(-3.0f, 0, 3.35f));
+            for (int i = 0; i < 4; i++) SlotMachine(P(r, "o98"), new Vector3(W - 0.42f, 0, -1.0f + i * 0.95f), i);
+            TigerStatue(P(r, "o99"), new Vector3(4.15f, 0, 3.75f));
             var darkWood = new Color(0.28f, 0.15f, 0.09f);
-            Box(r, new Vector3(-4.7f, 0.55f, -1.6f), new Vector3(0.9f, 1.1f, 3.2f), darkWood, "Bar");
-            Box(r, new Vector3(-4.65f, 1.13f, -1.6f), new Vector3(1.05f, 0.06f, 3.3f), gold);
-            Shelf(r, new Vector3(-W + 0.16f, 1.95f, -1.6f), 3.0f, darkWood, glowing: true);
-            GoldDie(r, new Vector3(-4.6f, 1.31f, -0.3f), 0.3f);
-            ChipStacks(r, new Vector3(-4.6f, 1.16f, -2.6f));
-            Chandelier(r, new Vector3(0, H, 0.4f));
+            Box(P(r, "o100"), new Vector3(-4.7f, 0.55f, -1.6f), new Vector3(0.9f, 1.1f, 3.2f), darkWood, "Bar");
+            Box(P(r, "o100"), new Vector3(-4.65f, 1.13f, -1.6f), new Vector3(1.05f, 0.06f, 3.3f), gold);
+            Shelf(P(r, "o101"), new Vector3(-W + 0.16f, 1.95f, -1.6f), 3.0f, darkWood, glowing: true);
+            GoldDie(P(r, "o102"), new Vector3(-4.6f, 1.31f, -0.3f), 0.3f);
+            ChipStacks(P(r, "o103"), new Vector3(-4.6f, 1.16f, -2.6f));
+            Chandelier(P(r, "o104"), new Vector3(0, H, 0.4f));
             for (int i = -1; i <= 1; i += 2)
                 for (int k = 0; k < 2; k++)
                     Glow(r, new Vector3(i * (W - 0.06f), 2.2f, -3.6f + k * 4.2f), new Vector3(0.08f, 0.3f, 0.2f), new Color(1f, 0.85f, 0.55f), "Arandela");
@@ -454,6 +546,20 @@ namespace Cacheta.App
 
         private static void Room(Transform r, RoomSpec s)
         {
+            // Os vãos da planta valem mais que os do código (que são a planta original).
+            var ab = _planta?.aberturas;
+            if (ab != null && ab.Length > 0)
+            {
+                s.Openings.Clear();
+                foreach (var a in ab)
+                {
+                    var side = a.lado == "esquerda" ? Side.Esquerda : a.lado == "direita" ? Side.Direita : Side.Fundo;
+                    var kind = a.tipo == "enrolar" ? Kind.PortaDeEnrolar : a.tipo == "janela" ? Kind.Janela : Kind.Livre;
+                    float top = a.altura > 0.3f ? Mathf.Min(a.altura, H) : 2.8f;
+                    s.Openings.Add(new Opening(side, Mathf.Min(a.de, a.ate), Mathf.Max(a.de, a.ate), top, kind, Mathf.Clamp(a.peitoril, 0, top - 0.2f)));
+                }
+            }
+
             var room = new GameObject("Sala").transform;
             room.SetParent(r, false);
             float len = D - F + T;

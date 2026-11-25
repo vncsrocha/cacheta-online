@@ -1,0 +1,162 @@
+{
+  "aberturas": [
+    {
+      "altura": 3.05,
+      "ate": 4.9,
+      "de": -4.9,
+      "lado": "fundo",
+      "peitoril": 0.45,
+      "tipo": "janela"
+    }
+  ],
+  "acabamentos": {
+    "barrado": "Lambri de madeira escura até 1,10 m com friso dourado",
+    "mesa": "Mesa de feltro verde com borda dourada e cadeiras vinho",
+    "paredes": "Vinho escuro",
+    "piso": "Carpete vinho com linhas douradas",
+    "teto": "Escuro com lustre dourado"
+  },
+  "chefe": "Little Tiger",
+  "id": "SalaVip",
+  "nome": "Sala VIP",
+  "notas": "",
+  "objetos": [
+    {
+      "cor": "#5a2e14",
+      "d": 1.1,
+      "fonte": "ia",
+      "forma": "ret",
+      "h": 1,
+      "id": "o97",
+      "nome": "Roleta",
+      "nota": "Peça marcante: roleta com fichas",
+      "onde": "chao",
+      "rot": 0,
+      "w": 2.2,
+      "x": -3,
+      "z": 3.35
+    },
+    {
+      "cor": "#73141f",
+      "d": 3.6,
+      "fonte": "gratis",
+      "forma": "ret",
+      "h": 1.8,
+      "id": "o98",
+      "nome": "Caça-níqueis (4)",
+      "nota": "",
+      "onde": "chao",
+      "rot": 0,
+      "w": 0.65,
+      "x": 4.78,
+      "z": 0.43
+    },
+    {
+      "cor": "#ffbf00",
+      "d": 0.8,
+      "fonte": "ia",
+      "forma": "ret",
+      "h": 2.1,
+      "id": "o99",
+      "nome": "Estátua do tigre dourado",
+      "nota": "Peça marcante: tigre sentado num pedestal preto",
+      "onde": "chao",
+      "rot": -35,
+      "w": 0.8,
+      "x": 4.15,
+      "z": 3.75
+    },
+    {
+      "cor": "#47261a",
+      "d": 3.2,
+      "fonte": "gratis",
+      "forma": "ret",
+      "h": 1.1,
+      "id": "o100",
+      "nome": "Bar",
+      "nota": "",
+      "onde": "chao",
+      "rot": 0,
+      "w": 0.9,
+      "x": -4.7,
+      "z": -1.6
+    },
+    {
+      "cor": "#47261a",
+      "d": 3,
+      "fonte": "gratis",
+      "forma": "ret",
+      "id": "o101",
+      "nome": "Prateleira iluminada",
+      "nota": "",
+      "onde": "parede",
+      "rot": 0,
+      "w": 0.3,
+      "x": -5.04,
+      "z": -1.6
+    },
+    {
+      "cor": "#ffbf00",
+      "d": 0.3,
+      "fonte": "ia",
+      "forma": "ret",
+      "id": "o102",
+      "nome": "Dado de ouro",
+      "nota": "Em cima do bar",
+      "onde": "chao",
+      "rot": 0,
+      "w": 0.3,
+      "x": -4.6,
+      "z": -0.3
+    },
+    {
+      "cor": "#d92626",
+      "d": 0.2,
+      "fonte": "gratis",
+      "forma": "ret",
+      "id": "o103",
+      "nome": "Fichas",
+      "nota": "Em cima do bar",
+      "onde": "chao",
+      "rot": 0,
+      "w": 0.3,
+      "x": -4.6,
+      "z": -2.6
+    },
+    {
+      "cor": "#ffbf00",
+      "d": 1.2,
+      "fonte": "gratis",
+      "forma": "circ",
+      "id": "o104",
+      "nome": "Lustre dourado",
+      "nota": "",
+      "onde": "teto",
+      "rot": 0,
+      "w": 1.2,
+      "x": 0,
+      "z": 0.4
+    },
+    {
+      "cor": "#1c2240",
+      "d": 30,
+      "fonte": "gratis",
+      "forma": "ret",
+      "id": "o105",
+      "nome": "Cidade à noite, lá embaixo",
+      "nota": "",
+      "onde": "fora",
+      "rot": 0,
+      "w": 40,
+      "x": 0,
+      "z": 29.6
+    }
+  ],
+  "ordem": 7,
+  "sala": {
+    "frente": -7.6,
+    "fundo": 4.6,
+    "largura": 10.4,
+    "pe": 3.4
+  }
+}

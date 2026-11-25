@@ -10,8 +10,8 @@ namespace Cacheta.App
     {
         /// <summary>Cacheta tradicional, com a regra da casa.</summary>
         CachetaTradicional,
-        /// <summary>Variante própria do jogo (nome provisório). Regras ainda a definir.</summary>
-        Cachetex,
+        /// <summary>Cacheta Clássica com power-ups (os power-ups ainda não estão no jogo). Antigo "Cachetex".</summary>
+        Carteado,
     }
 
     /// <summary>
@@ -189,23 +189,82 @@ namespace Cacheta.App
         public BotDifficulty Difficulty = BotDifficulty.Medio;
         public bool Online;          // ainda não implementado: por enquanto toda sala é local contra bots
         public string Code = "";     // código para os amigos entrarem (online)
+        /// <summary>Fase do Rei do Carteado que está sendo jogada (-1 = partida normal).</summary>
+        public int Fase = -1;
 
-        /// <summary>Regras de cada modo. O Cachetex começa igual à tradicional até definirmos as regras dele.</summary>
-        public RuleSet BuildRules()
+        /// <summary>
+        /// Regras de cada modo. O Carteado é a Clássica com power-ups; enquanto os power-ups não entram, as regras são
+        /// as mesmas.
+        /// </summary>
+        public RuleSet BuildRules() => RuleSet.Default();
+
+        public RoomConfig Clone() => (RoomConfig)MemberwiseClone();
+    }
+
+    /// <summary>Uma fase do Rei do Carteado: o chefe, a casa dele e o power-up de chefe.</summary>
+    public class FaseDoRei
+    {
+        public PlayerProfile Chefe;
+        public EnvironmentId Ambiente;
+        public string PowerUp;
+        public string Descricao;
+    }
+
+    /// <summary>
+    /// Rei do Carteado: as 7 fases na ordem sugerida (do power-up mais leve ao mais difícil; o Little Tiger é sempre o
+    /// último). O progresso fica salvo no computador.
+    /// </summary>
+    public static class ReiDoCarteado
+    {
+        private const string ProgressKey = "cacheta.rei.vencidas";
+
+        public static readonly FaseDoRei[] Fases =
         {
-            var r = RuleSet.Default();
-            if (Mode == GameMode.Cachetex)
-            {
-                // TODO(Cachetex): regras próprias. Ponto de partida para testar: sem limite de curinga por jogo.
-                r.MaxJokersPerMeld = 0;
-            }
-            return r;
+            new FaseDoRei { Chefe = PlayerProfile.TioBeto(), Ambiente = EnvironmentId.BarDoTioBeto, PowerUp = "Saideira",
+                            Descricao = "Dono do bar. Quando a mesa está para fechar, ele pede a saideira." },
+            new FaseDoRei { Chefe = PlayerProfile.DonaCleide(), Ambiente = EnvironmentId.SalaoDeBingo, PowerUp = "Fofoca",
+                            Descricao = "Todo mundo troca 3 cartas aleatórias." },
+            new FaseDoRei { Chefe = PlayerProfile.Marcela(), Ambiente = EnvironmentId.GaragemDaMarcela, PowerUp = "Carta Rara",
+                            Descricao = "Uma carta colecionável vai para a sua mão e só sai se for para bater." },
+            new FaseDoRei { Chefe = PlayerProfile.Ramiro(), Ambiente = EnvironmentId.QuintalDoRamiro, PowerUp = "Bateu Furado",
+                            Descricao = "Para ganhar a rodada é preciso bater duas vezes." },
+            new FaseDoRei { Chefe = PlayerProfile.Marquinho(), Ambiente = EnvironmentId.QuiosqueDoMarquinho, PowerUp = "Pra gringo é mais caro",
+                            Descricao = "Você fica batido uma volta inteira antes de bater, e não pode atravessar." },
+            new FaseDoRei { Chefe = PlayerProfile.Ana(), Ambiente = EnvironmentId.PatioDaUniversidade, PowerUp = "Planejada e Organizada",
+                            Descricao = "Você não pode reorganizar a mão e o vira fica escondido até decidir." },
+            new FaseDoRei { Chefe = PlayerProfile.LittleTiger(revelado: true), Ambiente = EnvironmentId.SalaVip, PowerUp = "Viciado",
+                            Descricao = "Ninguém corre. Ele perde 1 mesmo ganhando, e os outros perdem 2." },
+        };
+
+        /// <summary>Quantas fases você já venceu (a próxima é a que está liberada).</summary>
+        public static int Vencidas
+        {
+            get => Mathf.Clamp(PlayerPrefs.GetInt(ProgressKey, 0), 0, Fases.Length);
+            set { PlayerPrefs.SetInt(ProgressKey, Mathf.Clamp(value, 0, Fases.Length)); PlayerPrefs.Save(); }
         }
+
+        public static bool Liberada(int fase) => fase <= Vencidas;
+
+        /// <summary>Marca a fase como vencida (só avança se for a fase liberada agora).</summary>
+        public static void Venceu(int fase)
+        {
+            if (fase >= Vencidas) Vencidas = fase + 1;
+        }
+
+        /// <summary>A sala de uma fase: Carteado na casa do chefe, com ele sentado de frente para você.</summary>
+        public static RoomConfig Sala(int fase, BotDifficulty dificuldade) => new RoomConfig
+        {
+            Mode = GameMode.Carteado,
+            Environment = Fases[fase].Ambiente,
+            Bots = 3,
+            Difficulty = dificuldade,
+            Fase = fase,
+        };
     }
 
     public static class Names
     {
-        public static string Of(GameMode m) => m == GameMode.Cachetex ? "Carteado" : "Cacheta Clássica";
+        public static string Of(GameMode m) => m == GameMode.Carteado ? "Carteado" : "Cacheta Clássica";
 
         public static string Of(EnvironmentId e)
         {

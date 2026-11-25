@@ -86,6 +86,15 @@ namespace Cacheta.App
         private bool _zoom;
         private float _zoomT;
 
+        // Olhar em volta (a cabeça de quem está jogando): botão direito arrastado, ou A/D e W/S.
+        private const float MaxYaw = 75f, MinPitch = -30f, MaxPitch = 28f;
+        private static readonly Vector3 EyeFromNeck = new Vector3(0, 0.07f, 0.09f); // os olhos ficam à frente do pescoço
+        private float _lookYaw, _lookPitch;           // para onde a cabeça quer olhar
+        private float _headYaw, _headPitch;           // para onde ela está olhando agora (suavizado)
+        private bool _rightDown, _rightDragged;
+        private Vector2 _rightDownAt;
+        private float _keyYaw, _keyPitch;             // teclas seguradas
+
         // Interface
         private readonly List<string> _log = new List<string>();
         private GameEvent _lastBater;
@@ -314,6 +323,7 @@ namespace Cacheta.App
                     break;
                 case GameEventType.MatchEnded:
                     Log($"{who} levou a mesa!");
+                    if (_room.Fase >= 0 && _match.WinnerSeat == Me) ReiDoCarteado.Venceu(_room.Fase);
                     break;
             }
         }
@@ -453,8 +463,13 @@ namespace Cacheta.App
             float z = Mathf.SmoothStep(0, 1, _zoomT);
             var camPos = Vector3.Lerp(OverviewPos, ZoomPos, z);
             var camLook = Vector3.Lerp(OverviewLook, ZoomLook, z);
-            _cam.transform.position = camPos;
-            _cam.transform.rotation = Quaternion.LookRotation(camLook - camPos);
+            UpdateHead(dt);
+            // A cabeça gira em volta do pescoço: os olhos andam um pouquinho quando você olha para o lado.
+            var baseRot = Quaternion.LookRotation(camLook - camPos);
+            var headRot = Quaternion.AngleAxis(_headYaw, Vector3.up) * baseRot * Quaternion.AngleAxis(_headPitch, Vector3.right);
+            var neck = camPos - baseRot * EyeFromNeck;
+            _cam.transform.position = neck + headRot * EyeFromNeck;
+            _cam.transform.rotation = headRot;
 
             SyncHand();
             LayoutHand(camPos, dt);
@@ -462,6 +477,30 @@ namespace Cacheta.App
             UpdateSeats();
             UpdateFlyers(dt);
             UpdateHints();
+        }
+
+        /// <summary>
+        /// Movimento da cabeça. Com o zoom na mão a cabeça volta a olhar para as cartas; sem zoom ela fica para onde
+        /// você deixou, até você olhar de volta (ou apertar C).
+        /// </summary>
+        private void UpdateHead(float dt)
+        {
+            if (_paused) { _keyYaw = 0; _keyPitch = 0; }
+            else
+            {
+                _lookYaw = Mathf.Clamp(_lookYaw + _keyYaw * 90f * dt, -MaxYaw, MaxYaw);
+                _lookPitch = Mathf.Clamp(_lookPitch + _keyPitch * 60f * dt, MinPitch, MaxPitch);
+            }
+            if (_zoom && !_rightDragged) { _lookYaw = 0; _lookPitch = 0; }
+            float k = 1f - Mathf.Exp(-10f * dt);
+            _headYaw = Mathf.Lerp(_headYaw, _lookYaw, k);
+            _headPitch = Mathf.Lerp(_headPitch, _lookPitch, k);
+        }
+
+        private void CenterHead()
+        {
+            _lookYaw = 0;
+            _lookPitch = 0;
         }
 
         /// <summary>Mantém as cartas 3D iguais à mão real (o motor é a fonte da verdade).</summary>
@@ -760,20 +799,65 @@ namespace Cacheta.App
                     e.Use();
                     break;
                 }
+                // Botão direito: clique rápido liga/desliga o zoom; segurar e arrastar move a cabeça.
                 case EventType.MouseDown when e.button == 1:
-                    _zoom = !_zoom;
+                    _rightDown = true;
+                    _rightDragged = false;
+                    _rightDownAt = screen;
+                    e.Use();
+                    break;
+                case EventType.MouseDrag when e.button == 1 && _rightDown:
+                    if (!_rightDragged && (screen - _rightDownAt).magnitude > 6f) _rightDragged = true;
+                    if (_rightDragged)
+                    {
+                        // e.delta vem nas coordenadas da interface (1080 de altura), então a velocidade é igual em qualquer resolução.
+                        _lookYaw = Mathf.Clamp(_lookYaw + e.delta.x * 0.09f, -MaxYaw, MaxYaw);
+                        _lookPitch = Mathf.Clamp(_lookPitch + e.delta.y * 0.09f, MinPitch, MaxPitch);
+                        if (_zoom) _zoom = false; // olhar em volta sai do zoom na mão
+                    }
+                    e.Use();
+                    break;
+                case EventType.MouseUp when e.button == 1:
+                    if (_rightDown && !_rightDragged) { _zoom = !_zoom; if (_zoom) CenterHead(); }
+                    _rightDown = false;
+                    _rightDragged = false;
+                    e.Use();
+                    break;
+                // Botão do meio (clique na roda): olha de volta para a mesa.
+                case EventType.MouseDown when e.button == 2:
+                    CenterHead();
                     e.Use();
                     break;
                 case EventType.ScrollWheel:
                     _zoom = e.delta.y < 0;
+                    if (_zoom) CenterHead();
                     e.Use();
                     break;
                 case EventType.KeyDown:
-                    if (e.keyCode == KeyCode.Space || e.keyCode == KeyCode.Tab) { _zoom = !_zoom; e.Use(); }
+                    if (e.keyCode == KeyCode.Space || e.keyCode == KeyCode.Tab) { _zoom = !_zoom; if (_zoom) CenterHead(); e.Use(); }
                     else if (e.keyCode == KeyCode.LeftArrow) { MoveSelected(-1); e.Use(); }
                     else if (e.keyCode == KeyCode.RightArrow) { MoveSelected(1); e.Use(); }
                     else if (e.keyCode == KeyCode.Return && _selected.HasValue) { DoDiscard(_selected.Value); e.Use(); }
+                    else if (e.keyCode == KeyCode.C) { CenterHead(); e.Use(); }
+                    else if (LookKey(e.keyCode, true)) e.Use();
                     break;
+                case EventType.KeyUp:
+                    if (LookKey(e.keyCode, false)) e.Use();
+                    break;
+            }
+        }
+
+        /// <summary>A/D olham para os lados e W/S para cima e para baixo, enquanto a tecla estiver apertada.</summary>
+        private bool LookKey(KeyCode k, bool down)
+        {
+            float v = down ? 1f : 0f;
+            switch (k)
+            {
+                case KeyCode.A: _keyYaw = -v; return true;
+                case KeyCode.D: _keyYaw = v; return true;
+                case KeyCode.W: _keyPitch = -v; return true;
+                case KeyCode.S: _keyPitch = v; return true;
+                default: return false;
             }
         }
 
@@ -840,10 +924,10 @@ namespace Cacheta.App
         private void DrawTopBar()
         {
             if (GUI.Button(new Rect(20, 20, 70, 60), "II", UiKit.Button)) _paused = !_paused;
-            var r = new Rect(105, 20, 620, 60);
+            var r = new Rect(105, 20, _room.Fase >= 0 ? 940 : 620, 60);
             UiKit.Panel(r, 0.55f);
             GUI.Label(new Rect(r.x + 15, r.y + 14, r.width, 40),
-                $"{Names.Of(_room.Mode)}  •  Rodada {_match.RoundNumber}  •  Curinga: {JokerText()}", UiKit.Small);
+                $"{(_room.Fase >= 0 ? $"Rei do Carteado, fase {_room.Fase + 1}: {ReiDoCarteado.Fases[_room.Fase].Chefe.Name}" : Names.Of(_room.Mode))}  •  Rodada {_match.RoundNumber}  •  Curinga: {JokerText()}", UiKit.Small);
 
             string turn;
             if (_match.Phase == TurnPhase.FimDaRodada || _match.IsOver) turn = "";
@@ -968,7 +1052,7 @@ namespace Cacheta.App
             GUI.enabled = true;
 
             UiKit.Label(new Rect(x, y - 36, 1200, 30),
-                "Arraste as cartas para reorganizar  •  clique para selecionar  •  botão direito, roda do mouse ou Espaço: zoom  •  Esc: pausa",
+                "Arraste as cartas para reorganizar  •  clique para selecionar  •  botão direito ou Espaço: zoom  •  segure o botão direito e arraste (ou A/D) para olhar em volta  •  C: olhar a mesa  •  Esc: pausa",
                 UiKit.Tiny, new Color(1, 1, 1, 0.75f));
         }
 
@@ -1016,7 +1100,18 @@ namespace Cacheta.App
                 .Select(i => $"{(i == Me ? "Você" : _match.PlayerNames[i])}: {(_match.IsEliminated(i) ? "fora" : _match.GetTentos(i).ToString())}"));
             GUI.Label(new Rect(r.x + 40, r.yMax - 200, r.width - 80, 80), tentos, UiKit.Text);
 
-            if (_match.IsOver)
+            if (_match.IsOver && _room.Fase >= 0)
+            {
+                // Rei do Carteado: ganhou, volta para o mapa com a próxima fase liberada; perdeu, tenta de novo.
+                bool won = _match.WinnerSeat == Me;
+                if (GUI.Button(new Rect(r.center.x - 320, r.yMax - 100, 300, 70), won ? "Ver as fases" : "Tentar de novo", UiKit.Selected))
+                {
+                    if (won) _app.Go(ScreenId.ReiDoCarteado); else Restart();
+                }
+                if (GUI.Button(new Rect(r.center.x + 20, r.yMax - 100, 300, 70), won ? "Menu" : "Ver as fases", UiKit.Button))
+                    _app.Go(won ? ScreenId.MainMenu : ScreenId.ReiDoCarteado);
+            }
+            else if (_match.IsOver)
             {
                 if (GUI.Button(new Rect(r.center.x - 320, r.yMax - 100, 300, 70), "Jogar de novo", UiKit.Selected)) Restart();
                 if (GUI.Button(new Rect(r.center.x + 20, r.yMax - 100, 300, 70), "Menu", UiKit.Button)) _app.Go(ScreenId.MainMenu);

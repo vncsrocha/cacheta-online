@@ -4,14 +4,19 @@ using UnityEngine;
 
 namespace Cacheta.App
 {
-    /// <summary>Menu inicial: nome do jogo e o seu personagem à esquerda, menu à direita.</summary>
+    /// <summary>
+    /// Menu inicial (wireframe "1. Menu principal"): o nome do jogo e o seu personagem à esquerda, os modos à direita.
+    /// Cacheta Clássica e Carteado abrem as opções "Criar sala" e "Entrar em uma sala" logo abaixo do botão.
+    /// </summary>
     public class MainMenuScreen : IScreen
     {
         private readonly GameApp _app;
+        private GameMode? _aberto;   // modo com as opções de sala abertas
         public MainMenuScreen(GameApp app) => _app = app;
 
         public void Enter()
         {
+            _aberto = null;
             _app.Stage.SetEnvironment(EnvironmentId.BarDoTioBeto);
             _app.Stage.SetFraming(MenuStage.Framing.Menu);
         }
@@ -21,29 +26,40 @@ namespace Cacheta.App
 
         public void Draw()
         {
-            // Esquerda: título e nome do jogador (o personagem 3D aparece abaixo do título).
-            UiKit.Shadowed(new Rect(80, 60, 900, 120), "CACHETA", UiKit.Title, Color.white);
-            UiKit.Shadowed(new Rect(86, 170, 900, 50), "online", UiKit.Subtitle, Palette.Gold);
-            var nameRect = new Rect(UiKit.W * 0.26f - 200, UiKit.H * 0.78f, 400, 50);
+            // Esquerda: logo e, abaixo, o seu personagem 3D (vem do palco) com o nome embaixo.
+            UiKit.Shadowed(new Rect(80, 60, 900, 120), "CARTEADO", UiKit.Title, Color.white);
+            UiKit.Shadowed(new Rect(86, 170, 900, 40), "cacheta com os amigos", UiKit.Small, Palette.Gold);
+            var nameRect = new Rect(UiKit.W * 0.26f - 200, UiKit.H * 0.86f, 400, 50);
             UiKit.Panel(nameRect, 0.5f);
             GUI.Label(nameRect, _app.Profile.Name, UiKit.Center);
 
-            // Direita: menu.
-            float w = 560, x = UiKit.W - w - 90, y = UiKit.H * 0.16f, h = 84, gap = 18;
-            UiKit.Panel(new Rect(x - 30, y - 40, w + 60, 7 * (h + gap) + 60), 0.45f);
-            if (GUI.Button(new Rect(x, y, w, h), "Jogar Cacheta", UiKit.BigButton)) StartMode(GameMode.CachetaTradicional);
+            float w = 600, x = UiKit.W - w - 90, gap = 14, h = 76, sub = 62;
+            int abertos = _aberto.HasValue ? 1 : 0;
+
+            // Canto de cima: perfil, nível e moedas (nível e moedas ainda não existem: ficam em 1 e 0).
+            var chip = new Rect(x + w - 470, 40, 470, 64);
+            UiKit.Panel(chip, 0.6f);
+            UiKit.Label(new Rect(chip.x + 20, chip.y + 14, 260, 36), _app.Profile.Name, UiKit.Small);
+            UiKit.Label(new Rect(chip.x + 220, chip.y + 14, 240, 36), "Nível 1  ·  0 moedas", UiKit.Small, Palette.Gold);
+
+            // Direita: o menu, centralizado na altura.
+            float total = 3 * (h + gap) + abertos * 2 * (sub + gap) + 4 * (h + gap) - gap;
+            float y = Mathf.Max(140, (UiKit.H - total) / 2 + 20);
+            UiKit.Panel(new Rect(x - 30, y - 30, w + 60, total + 60), 0.45f);
+
+            ModeButton(new Rect(x, y, w, h), GameMode.CachetaTradicional, "Cacheta Clássica", ref y, gap, sub);
+            ModeButton(new Rect(x, y, w, h), GameMode.Carteado, "Carteado", ref y, gap, sub);
+            if (GUI.Button(new Rect(x, y, w, h), "Rei do Carteado", UiKit.BigButton)) _app.Go(ScreenId.ReiDoCarteado);
             y += h + gap;
-            if (GUI.Button(new Rect(x, y, w, h), "Jogar Cachetex  (novo)", UiKit.BigButton)) StartMode(GameMode.Cachetex);
-            y += h + gap;
-            if (GUI.Button(new Rect(x, y, w, h), "Entrar em uma sala", UiKit.BigButton)) _app.Go(ScreenId.JoinRoom);
+
+            float half = (w - gap) / 2;
+            if (GUI.Button(new Rect(x, y, half, h), "Fichário", UiKit.BigButton)) _app.Go(ScreenId.Fichario);
+            if (GUI.Button(new Rect(x + half + gap, y, half, h), "Loja", UiKit.BigButton)) _app.Go(ScreenId.Loja);
             y += h + gap;
             if (GUI.Button(new Rect(x, y, w, h), "Personalizar perfil", UiKit.BigButton)) _app.Go(ScreenId.Profile);
             y += h + gap;
-            if (GUI.Button(new Rect(x, y, w, h), "Elenco nos cenários", UiKit.BigButton)) _app.Go(ScreenId.Elenco);
-            y += h + gap;
-            if (GUI.Button(new Rect(x, y, w, h), "Opções", UiKit.BigButton)) _app.Go(ScreenId.Options);
-            y += h + gap;
-            if (GUI.Button(new Rect(x, y, w, h), "Sair", UiKit.BigButton))
+            if (GUI.Button(new Rect(x, y, half, h), "Opções", UiKit.BigButton)) _app.Go(ScreenId.Options);
+            if (GUI.Button(new Rect(x + half + gap, y, half, h), "Sair", UiKit.BigButton))
             {
 #if UNITY_EDITOR
                 UnityEditor.EditorApplication.isPlaying = false;
@@ -52,13 +68,153 @@ namespace Cacheta.App
 #endif
             }
 
+            // Ferramenta de revisão (sai antes do lançamento): ver o elenco 3D em cada cenário.
+            if (GUI.Button(new Rect(20, UiKit.H - 110, 300, 56), "Elenco nos cenários", UiKit.Button)) _app.Go(ScreenId.Elenco);
             UiKit.Label(new Rect(20, UiKit.H - 40, 900, 30), "Protótipo funcional: arte provisória", UiKit.Tiny, new Color(1, 1, 1, 0.6f));
         }
 
-        private void StartMode(GameMode mode)
+        /// <summary>Botão de modo que abre "Criar sala" e "Entrar em uma sala" logo abaixo.</summary>
+        private void ModeButton(Rect r, GameMode mode, string label, ref float y, float gap, float sub)
         {
-            _app.Room = new RoomConfig { Mode = mode, Environment = _app.Room.Environment, Bots = _app.Room.Bots, Difficulty = _app.Room.Difficulty };
-            _app.Go(ScreenId.CreateRoom);
+            bool open = _aberto == mode;
+            var style = mode == GameMode.Carteado || open ? SelectedBig : UiKit.BigButton;
+            if (GUI.Button(r, (open ? "▾  " : "") + label, style)) _aberto = open ? (GameMode?)null : mode;
+            y += r.height + gap;
+            if (!open) return;
+
+            float indent = 60;
+            if (GUI.Button(new Rect(r.x + indent, y, r.width - indent, sub), "Criar sala", UiKit.Button))
+            {
+                var room = _app.Room.Clone();
+                room.Mode = mode;
+                room.Fase = -1;
+                _app.Room = room;
+                _app.Go(ScreenId.CreateRoom);
+            }
+            y += sub + gap;
+            if (GUI.Button(new Rect(r.x + indent, y, r.width - indent, sub), "Entrar em uma sala", UiKit.Button)) _app.Go(ScreenId.JoinRoom);
+            y += sub + gap;
+        }
+
+        private static GUIStyle _selectedBig;
+        private static GUIStyle SelectedBig
+        {
+            get
+            {
+                if (_selectedBig == null)
+                {
+                    _selectedBig = new GUIStyle(UiKit.BigButton);
+                    _selectedBig.normal.textColor = Palette.Gold;
+                    _selectedBig.hover.textColor = Palette.Gold;
+                }
+                return _selectedBig;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Rei do Carteado (wireframe "13"): as 7 fases, uma por chefe, na casa dele. Vencer uma fase libera a próxima.
+    /// Os power-ups de chefe ainda não estão no jogo: por enquanto a fase é uma Carteado normal com o chefe na mesa.
+    /// </summary>
+    public class ReiDoCarteadoScreen : IScreen
+    {
+        private readonly GameApp _app;
+        private int _sel;
+        private BotDifficulty _dificuldade = BotDifficulty.Medio;
+        public ReiDoCarteadoScreen(GameApp app) => _app = app;
+
+        public void Enter()
+        {
+            _sel = Mathf.Min(ReiDoCarteado.Vencidas, ReiDoCarteado.Fases.Length - 1);
+            _app.Stage.SetFraming(MenuStage.Framing.Centered);
+            _app.Stage.SetEnvironment(ReiDoCarteado.Fases[_sel].Ambiente);
+        }
+
+        public void Exit() { }
+        public void Tick() { }
+
+        public void Draw()
+        {
+            var fases = ReiDoCarteado.Fases;
+            int vencidas = ReiDoCarteado.Vencidas;
+            float x0 = 80, y0 = 60, cw = 300, ch = 250, gap = 24;
+
+            UiKit.Panel(new Rect(x0 - 30, y0 - 20, 4 * cw + 3 * gap + 60, 120 + 2 * ch + gap + 20), 0.6f);
+            UiKit.Shadowed(new Rect(x0, y0, 900, 60), "Rei do Carteado", UiKit.Subtitle, Color.white);
+            UiKit.Label(new Rect(x0 + 380, y0 + 14, 900, 40), $"{vencidas} de {fases.Length} chefes vencidos", UiKit.Small, Palette.Gold);
+
+            for (int i = 0; i < fases.Length; i++)
+            {
+                var f = fases[i];
+                var r = new Rect(x0 + (i % 4) * (cw + gap), y0 + 90 + (i / 4) * (ch + gap), cw, ch);
+                bool liberada = ReiDoCarteado.Liberada(i), vencida = i < vencidas, final = i == fases.Length - 1;
+                UiKit.Box(r, i == _sel ? new Color(0.35f, 0.26f, 0.05f, 0.92f) : new Color(0.1f, 0.09f, 0.12f, liberada ? 0.88f : 0.6f));
+                UiKit.Border(r, i == _sel ? Palette.Gold : new Color(1, 1, 1, liberada ? 0.5f : 0.15f), i == _sel ? 5 : 2);
+                string tag = final ? "FASE FINAL" : $"FASE {i + 1}";
+                if (vencida) tag += "  ·  VENCIDA";
+                else if (!liberada) tag += "  ·  BLOQUEADA";
+                var dim = liberada ? Color.white : new Color(1, 1, 1, 0.4f);
+                UiKit.Label(new Rect(r.x + 18, r.y + 14, r.width - 30, 30), tag, UiKit.Tiny, vencida ? new Color(0.6f, 1f, 0.6f) : Palette.Gold);
+                UiKit.Label(new Rect(r.x + 18, r.y + 54, r.width - 30, 50), liberada || vencida ? f.Chefe.Name : "???", UiKit.Text, dim);
+                UiKit.Label(new Rect(r.x + 18, r.y + 100, r.width - 30, 30), Names.Of(f.Ambiente), UiKit.Small, dim);
+                UiKit.Label(new Rect(r.x + 18, r.y + 150, r.width - 30, 80), "Power-up: " + f.PowerUp, UiKit.Small, dim);
+                if (liberada && GUI.Button(r, GUIContent.none, GUIStyle.none))
+                {
+                    _sel = i;
+                    _app.Stage.SetEnvironment(f.Ambiente);
+                }
+            }
+            // Oitavo espaço: a recompensa.
+            var rw = new Rect(x0 + 3 * (cw + gap), y0 + 90 + ch + gap, cw, ch);
+            UiKit.Border(rw, new Color(1, 1, 1, 0.3f), 2);
+            UiKit.Label(new Rect(rw.x + 18, rw.y + 20, rw.width - 30, 40), "Recompensa", UiKit.Text, Palette.Gold);
+            UiKit.Label(new Rect(rw.x + 18, rw.y + 70, rw.width - 30, 160), "Cada chefe vencido dá packs de power-up e o colecionável dele.", UiKit.Small);
+
+            // Painel de baixo: a fase escolhida.
+            var sel = fases[_sel];
+            float py = UiKit.H - 250;
+            UiKit.Panel(new Rect(0, py, UiKit.W, 250), 0.7f);
+            UiKit.Label(new Rect(80, py + 25, 1100, 50), $"{sel.Chefe.Name}  ·  {Names.Of(sel.Ambiente)}", UiKit.Subtitle);
+            UiKit.Label(new Rect(80, py + 85, 1100, 40), $"Power-up do chefe: {sel.PowerUp}. {sel.Descricao}", UiKit.Small);
+            UiKit.Label(new Rect(80, py + 125, 1100, 40), "Os power-ups ainda não estão no jogo: por enquanto é uma partida de Carteado com o chefe sentado de frente para você.",
+                        UiKit.Tiny, new Color(1, 1, 1, 0.65f));
+            _dificuldade = UiKit.Selector(new Rect(80, py + 165, 700, 62), "Dificuldade", _dificuldade, Names.Of);
+
+            if (GUI.Button(new Rect(UiKit.W - 760, py + 150, 300, 80), "Voltar", UiKit.Button)) { _app.Go(ScreenId.MainMenu); return; }
+            GUI.enabled = ReiDoCarteado.Liberada(_sel);
+            if (GUI.Button(new Rect(UiKit.W - 420, py + 150, 340, 80), _sel < ReiDoCarteado.Vencidas ? "Jogar de novo" : "Jogar a fase", UiKit.Selected))
+            {
+                _app.Room = ReiDoCarteado.Sala(_sel, _dificuldade);
+                _app.Go(ScreenId.Table);
+            }
+            GUI.enabled = true;
+        }
+    }
+
+    /// <summary>Telas que ainda não existem (Fichário e Loja): explicam o que vai ter nelas.</summary>
+    public class EmBreveScreen : IScreen
+    {
+        private readonly GameApp _app;
+        private readonly string _titulo, _texto;
+        public EmBreveScreen(GameApp app, string titulo, string texto)
+        {
+            _app = app;
+            _titulo = titulo;
+            _texto = texto;
+        }
+
+        public void Enter() => _app.Stage.SetFraming(MenuStage.Framing.Centered);
+        public void Exit() { }
+        public void Tick() { }
+
+        public void Draw()
+        {
+            float w = 800, x = UiKit.W - w - 90, y = 240;
+            UiKit.Panel(new Rect(x - 40, y - 60, w + 80, 520), 0.75f);
+            GUI.Label(new Rect(x, y - 40, w, 60), _titulo, UiKit.Subtitle);
+            UiKit.Label(new Rect(x, y + 40, w, 40), "Em breve", UiKit.Text, Palette.Gold);
+            UiKit.Label(new Rect(x, y + 100, w, 220), _texto, UiKit.Small);
+            if (GUI.Button(new Rect(x, y + 340, 300, 80), "Voltar", UiKit.Button)) _app.Go(ScreenId.MainMenu);
         }
     }
 
@@ -276,9 +432,9 @@ namespace Cacheta.App
 
             room.Mode = UiKit.Selector(new Rect(x, y, w, row), "Modo", room.Mode, Names.Of);
             y += row + gap;
-            if (room.Mode == GameMode.Cachetex)
+            if (room.Mode == GameMode.Carteado)
             {
-                UiKit.Label(new Rect(x, y, w, row), "Regras do Cachetex ainda em definição: por enquanto é a Cacheta sem limite de curingas por jogo.",
+                UiKit.Label(new Rect(x, y, w, row), "Carteado é a Clássica com power-ups. Os power-ups ainda não estão no jogo: por enquanto as regras são as mesmas.",
                             UiKit.Small, Palette.Gold);
                 y += row + gap;
             }
@@ -330,7 +486,7 @@ namespace Cacheta.App
             _code = GUI.TextField(new Rect(x, y, w, 70), _code ?? "", 8, UiKit.Field).ToUpperInvariant();
             y += 100;
             UiKit.Label(new Rect(x, y, w, 80),
-                "Salas online chegam na fase do multiplayer. Enquanto isso, use \"Jogar Cacheta\" para jogar contra bots.",
+                "Salas online chegam na fase do multiplayer. Enquanto isso, crie uma sala para jogar contra bots.",
                 UiKit.Small, new Color(1, 1, 1, 0.75f));
             y += 110;
             if (GUI.Button(new Rect(x, y, 300, 80), "Voltar", UiKit.Button)) _app.Go(ScreenId.MainMenu);
