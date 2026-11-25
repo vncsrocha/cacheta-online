@@ -29,8 +29,8 @@ namespace Cacheta.App
             GUI.Label(nameRect, _app.Profile.Name, UiKit.Center);
 
             // Direita: menu.
-            float w = 560, x = UiKit.W - w - 90, y = UiKit.H * 0.2f, h = 84, gap = 18;
-            UiKit.Panel(new Rect(x - 30, y - 40, w + 60, 6 * (h + gap) + 60), 0.45f);
+            float w = 560, x = UiKit.W - w - 90, y = UiKit.H * 0.16f, h = 84, gap = 18;
+            UiKit.Panel(new Rect(x - 30, y - 40, w + 60, 7 * (h + gap) + 60), 0.45f);
             if (GUI.Button(new Rect(x, y, w, h), "Jogar Cacheta", UiKit.BigButton)) StartMode(GameMode.CachetaTradicional);
             y += h + gap;
             if (GUI.Button(new Rect(x, y, w, h), "Jogar Cachetex  (novo)", UiKit.BigButton)) StartMode(GameMode.Cachetex);
@@ -38,6 +38,8 @@ namespace Cacheta.App
             if (GUI.Button(new Rect(x, y, w, h), "Entrar em uma sala", UiKit.BigButton)) _app.Go(ScreenId.JoinRoom);
             y += h + gap;
             if (GUI.Button(new Rect(x, y, w, h), "Personalizar perfil", UiKit.BigButton)) _app.Go(ScreenId.Profile);
+            y += h + gap;
+            if (GUI.Button(new Rect(x, y, w, h), "Elenco nos cenários", UiKit.BigButton)) _app.Go(ScreenId.Elenco);
             y += h + gap;
             if (GUI.Button(new Rect(x, y, w, h), "Opções", UiKit.BigButton)) _app.Go(ScreenId.Options);
             y += h + gap;

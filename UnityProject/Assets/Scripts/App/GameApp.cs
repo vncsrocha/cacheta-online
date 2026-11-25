@@ -11,6 +11,7 @@ namespace Cacheta.App
         CreateRoom,
         JoinRoom,
         Table,
+        Elenco,
     }
 
     /// <summary>Uma tela do jogo. As telas só desenham e chamam ações; o estado fica no <see cref="GameApp"/>.</summary>
@@ -79,6 +80,7 @@ namespace Cacheta.App
             _screens[ScreenId.CreateRoom] = new CreateRoomScreen(this);
             _screens[ScreenId.JoinRoom] = new JoinRoomScreen(this);
             _screens[ScreenId.Table] = new TableScreen(this);
+            _screens[ScreenId.Elenco] = new CastViewerScreen(this);
 
             // Primeira vez: começa criando o personagem.
             Go(SaveSystem.HasProfile ? ScreenId.MainMenu : ScreenId.Profile);
@@ -90,8 +92,8 @@ namespace Cacheta.App
             CurrentId = id;
             _current = _screens[id];
 
-            // O cenário do menu existe em todas as telas, menos na mesa (que monta o próprio mundo).
-            if (id == ScreenId.Table)
+            // O cenário do menu existe em todas as telas, menos na mesa e no elenco (que montam o próprio mundo).
+            if (id == ScreenId.Table || id == ScreenId.Elenco)
             {
                 Stage?.Destroy();
                 Stage = null;

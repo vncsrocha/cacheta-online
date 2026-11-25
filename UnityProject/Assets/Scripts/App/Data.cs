@@ -59,6 +59,8 @@ namespace Cacheta.App
         public bool Chain;
         /// <summary>Modelo 3D pronto em Resources/Personagens (vazio = monta com formas simples).</summary>
         public string Model = "";
+        /// <summary>Altura da pessoa em metros (1,75 = altura padrão). Só vale para os modelos 3D.</summary>
+        public float Height = 1.75f;
 
         public PlayerProfile Clone() => (PlayerProfile)MemberwiseClone();
 
@@ -92,7 +94,7 @@ namespace Cacheta.App
             Name = "Tio Beto", Gender = Gender.Masculino, SkinTone = 3, Hair = HairStyle.Curto, HairColor = 0,
             ShirtColor = 0, ShirtColor2 = 10, Pattern = ShirtPattern.Listrada, PantsColor = 9, Bottom = Bottoms.Bermuda,
             Shoes = Shoes.Chinelo, Body = BodyType.Barrigudo, Mustache = true, Chain = true,
-            Model = "TioBeto",
+            Model = "TioBeto", Height = 1.70f,
         };
 
         // Os outros chefes do Rei do Carteado. Também jogam como bots comuns (sem o poder de chefe).
@@ -101,35 +103,35 @@ namespace Cacheta.App
         {
             Name = "Dona Cleide", Gender = Gender.Feminino, SkinTone = 2, Hair = HairStyle.Curto, HairColor = 4,
             ShirtColor = 2, Bottom = Bottoms.Calca, PantsColor = 2, Shoes = Shoes.Tenis, Body = BodyType.Barrigudo, Glasses = true,
-            Model = "DonaCleide",
+            Model = "DonaCleide", Height = 1.60f,
         };
 
         public static PlayerProfile Marquinho() => new PlayerProfile
         {
             Name = "Marquinho", Gender = Gender.Masculino, SkinTone = 4, Hair = HairStyle.Curto, HairColor = 3,
             ShirtColor = 3, PantsColor = 6, Bottom = Bottoms.Bermuda, Shoes = Shoes.Chinelo, Body = BodyType.Magro, Chain = true,
-            Model = "Marquinho",
+            Model = "Marquinho", Height = 1.75f,
         };
 
         public static PlayerProfile Ana() => new PlayerProfile
         {
             Name = "Ana", Gender = Gender.Feminino, SkinTone = 0, Hair = HairStyle.Comprido, HairColor = 7,
             ShirtColor = 10, PantsColor = 3, Bottom = Bottoms.Calca, Shoes = Shoes.Tenis, Body = BodyType.Magro, Glasses = true,
-            Model = "Ana",
+            Model = "Ana", Height = 1.58f,
         };
 
         public static PlayerProfile Marcela() => new PlayerProfile
         {
             Name = "Marcela", Gender = Gender.Feminino, SkinTone = 4, Hair = HairStyle.BlackPower, HairColor = 0,
             ShirtColor = 3, PantsColor = 3, Bottom = Bottoms.Bermuda, Shoes = Shoes.Tenis, Body = BodyType.Magro,
-            Model = "Marcela",
+            Model = "Marcela", Height = 1.65f,
         };
 
         public static PlayerProfile Ramiro() => new PlayerProfile
         {
             Name = "Ramiro", Gender = Gender.Masculino, SkinTone = 5, Hair = HairStyle.Careca, ShirtColor = 2,
             PantsColor = 9, Bottom = Bottoms.Bermuda, Shoes = Shoes.Chinelo, Body = BodyType.Barrigudo, Mustache = true,
-            Model = "Ramiro",
+            Model = "Ramiro", Height = 1.82f,
         };
 
         /// <summary>Chefe final. Até a fase dele aparece de terno preto; na final se revela (modelo LittleTigerRevelado).</summary>
@@ -137,7 +139,7 @@ namespace Cacheta.App
         {
             Name = "Little Tiger", Gender = Gender.Masculino, SkinTone = 3, Hair = HairStyle.Curto, HairColor = 0,
             ShirtColor = revelado ? 6 : 5, PantsColor = 5, Bottom = Bottoms.Calca, Shoes = Shoes.Tenis, Body = BodyType.Magro, Chain = true,
-            Model = revelado ? "LittleTigerRevelado" : "LittleTiger",
+            Model = revelado ? "LittleTigerRevelado" : "LittleTiger", Height = 1.85f,
         };
 
         /// <summary>Todos os chefes, na ordem sugerida do Rei do Carteado (o Little Tiger aparece disfarçado).</summary>
@@ -145,6 +147,15 @@ namespace Cacheta.App
         {
             TioBeto(), DonaCleide(), Marcela(), Ramiro(), Marquinho(), Ana(), LittleTiger(),
         };
+
+        /// <summary>O chefe que joga em casa naquele cenário (na Sala VIP o Little Tiger já aparece revelado).</summary>
+        public static PlayerProfile ChefeDe(EnvironmentId env)
+        {
+            if (env == EnvironmentId.SalaVip) return LittleTiger(revelado: true);
+            foreach (var c in Chefes())
+                if (Names.EnvironmentOf(c.Name) == env) return c;
+            return TioBeto();
+        }
     }
 
     /// <summary>Opções do jogo (menu Opções).</summary>

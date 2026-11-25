@@ -117,13 +117,14 @@ namespace Cacheta.App
             var rng = new System.Random();
             _profiles = new List<PlayerProfile> { app.Profile.Clone() };
             var botNames = BotNames.OrderBy(_ => rng.Next()).ToList();
-            // Os lugares são ocupados pelos personagens do jogo (sorteados); o Tio Beto senta de frente para você.
-            // Se a mesa tiver mais lugares que personagens, completa com bots genéricos.
-            var chefes = PlayerProfile.Chefes().Skip(1).OrderBy(_ => rng.Next()).ToList();
+            // Os lugares são ocupados pelos personagens do jogo (sorteados); o dono do cenário (o chefe que joga
+            // em casa) senta de frente para você. Se a mesa tiver mais lugares que personagens, completa com bots genéricos.
+            var anfitriao = PlayerProfile.ChefeDe(room.Environment);
+            var chefes = PlayerProfile.Chefes().Where(c => c.Name != anfitriao.Name).OrderBy(_ => rng.Next()).ToList();
             int extra = 0;
             for (int i = 0; i < room.Bots; i++)
             {
-                if (i == room.Bots / 2) _profiles.Add(PlayerProfile.TioBeto());
+                if (i == room.Bots / 2) _profiles.Add(anfitriao);
                 else if (chefes.Count > 0) { _profiles.Add(chefes[0]); chefes.RemoveAt(0); }
                 else _profiles.Add(PlayerProfile.Random(botNames[extra++ % botNames.Count], rng));
             }
@@ -151,46 +152,18 @@ namespace Cacheta.App
             if (_match != null) _match.EventRaised -= OnEvent;
         }
 
-        private void BuildTable(EnvironmentLook look)
-        {
-            Palette.Prim(PrimitiveType.Cylinder, _world, new Vector3(0, TableTop - 0.02f, 0), new Vector3(TableRadius * 2, 0.02f, TableRadius * 2), look.Table, "Tampo");
-            Palette.Prim(PrimitiveType.Cylinder, _world, new Vector3(0, TableTop - 0.05f, 0), new Vector3(TableRadius * 2 + 0.04f, 0.015f, TableRadius * 2 + 0.04f), look.TableEdge);
-            Palette.Prim(PrimitiveType.Cylinder, _world, new Vector3(0, TableTop / 2, 0), new Vector3(0.12f, TableTop / 2, 0.12f), look.TableEdge, "Pé");
-            Palette.Prim(PrimitiveType.Cylinder, _world, new Vector3(0, 0.02f, 0), new Vector3(0.8f, 0.02f, 0.8f), look.TableEdge);
-        }
+        private void BuildTable(EnvironmentLook look) => TableProps.Table(_world, look);
 
         /// <summary>Você fica de frente para a mesa (-Z); os adversários se espalham do outro lado, da esquerda para a direita.</summary>
         private void BuildSeats(int players, EnvironmentLook look)
         {
-            _seatPos = new Vector3[players];
+            _seatPos = TableProps.Seats(players);
             _avatars = new GameObject[players];
             _heldBacks = new List<GameObject>[players];
-            _seatPos[Me] = new Vector3(0, 0, -SeatRadius);
-            int k = players - 1;
             for (int i = 1; i < players; i++)
             {
-                float deg = k == 1 ? 90f : 180f - (i - 1) * (180f / (k - 1));
-                float rad = deg * Mathf.Deg2Rad;
-                _seatPos[i] = new Vector3(Mathf.Cos(rad), 0, Mathf.Sin(rad)) * SeatRadius;
-            }
-
-            for (int i = 1; i < players; i++)
-            {
-                var face = Quaternion.LookRotation(-_seatPos[i].normalized);
-                var chair = new GameObject("Cadeira " + i).transform;
-                chair.SetParent(_world, false);
-                chair.position = _seatPos[i];
-                chair.rotation = face;
-                Palette.Prim(PrimitiveType.Cube, chair, new Vector3(0, 0.44f, -0.02f), new Vector3(0.5f, 0.05f, 0.48f), look.Chair);
-                Palette.Prim(PrimitiveType.Cube, chair, new Vector3(0, 0.78f, -0.26f), new Vector3(0.5f, 0.62f, 0.05f), look.Chair);
-                for (int s = -1; s <= 1; s += 2)
-                    for (int f = -1; f <= 1; f += 2)
-                        Palette.Prim(PrimitiveType.Cube, chair, new Vector3(s * 0.22f, 0.21f, f * 0.2f - 0.02f), new Vector3(0.04f, 0.42f, 0.04f), look.Chair);
-
-                var av = AvatarBuilder.Build(_profiles[i], _world, seated: true);
-                av.transform.position = _seatPos[i] + face * new Vector3(0, 0, -0.05f);
-                av.transform.rotation = face;
-                _avatars[i] = av;
+                TableProps.Chair(_world, _seatPos[i], look, "Cadeira " + i);
+                _avatars[i] = TableProps.Seated(_profiles[i], _world, _seatPos[i]);
                 _heldBacks[i] = new List<GameObject>();
             }
             _heldBacks[Me] = new List<GameObject>();

@@ -11,14 +11,15 @@ namespace Cacheta.App
     {
         public const string Folder = "Personagens/";
 
-        /// <summary>Altura em metros que o modelo deve ter em pé (mesma escala do personagem de formas simples).</summary>
+        /// <summary>Altura no jogo de uma pessoa de 1,75 m (mesma escala do personagem de formas simples e da mesa).</summary>
         public const float StandingHeight = 1.95f;
+        public const float ReferenceHeight = 1.75f;
 
         public static bool Exists(string model)
             => !string.IsNullOrEmpty(model) && Resources.Load<GameObject>(Folder + model) != null;
 
         /// <summary>Instancia o modelo dentro de <paramref name="root"/>. Devolve false se não houver modelo.</summary>
-        public static bool TryBuild(Transform root, string model, bool seated)
+        public static bool TryBuild(Transform root, string model, bool seated, float heightMeters = ReferenceHeight)
         {
             if (string.IsNullOrEmpty(model)) return false;
             var prefab = Resources.Load<GameObject>(Folder + model);
@@ -30,7 +31,7 @@ namespace Cacheta.App
             go.transform.localRotation = Quaternion.identity;
 
             ToonMaterials(go);
-            FitHeight(go);
+            FitHeight(go, StandingHeight * (heightMeters > 0.5f ? heightMeters : ReferenceHeight) / ReferenceHeight);
 
             if (seated) Sit(go, model);
             else
@@ -131,14 +132,14 @@ namespace Cacheta.App
         }
 
         /// <summary>Escala para a altura padrão e apoia os pés no chão (y = 0 do pai).</summary>
-        private static void FitHeight(GameObject go)
+        private static void FitHeight(GameObject go, float height)
         {
             var renderers = go.GetComponentsInChildren<Renderer>();
             if (renderers.Length == 0) return;
             var b = renderers[0].bounds;
             foreach (var r in renderers) b.Encapsulate(r.bounds);
             if (b.size.y < 0.01f) return;
-            float k = StandingHeight / b.size.y;
+            float k = height / b.size.y;
             go.transform.localScale *= k;
             // recalcula depois da escala
             b = renderers[0].bounds;
