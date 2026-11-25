@@ -3,17 +3,31 @@ using UnityEngine;
 
 namespace Cacheta.App
 {
+    /// <summary>Jeitos de segurar as cartas.</summary>
+    public enum HoldStyle
+    {
+        /// <summary>Duas mãos, leque na frente do peito.</summary>
+        Duas,
+        /// <summary>Leque erguido numa mão só, perto do rosto; a outra mão descansa na mesa.</summary>
+        Alto,
+        /// <summary>Debruçado, com as cartas baixas numa mão, perto da mesa, olhando para elas; a outra descansa na mesa.</summary>
+        Mesa,
+        /// <summary>Cotovelo apoiado na mesa e o leque levantado numa mão; a outra descansa na mesa.</summary>
+        Cotovelo,
+    }
+
     /// <summary>
-    /// Faz o personagem sentado segurar as cartas com as duas mãos, na frente do peito, e dá a cada um a sua postura.
+    /// Faz o personagem sentado segurar as cartas e dá a cada um a sua postura.
     /// <see cref="Fan"/> é o ponto onde o leque de cartas fica (quem desenha as cartas coloca elas dentro dele, com
     /// <see cref="LayCard"/>).
     /// Nos modelos 3D, por cima da animação de sentado e a cada quadro:
     ///  1. postura: coluna mais ereta (cada um com a sua inclinação e um leve giro), ombros levantados (a animação
-    ///     deixa todos com o ombro caído) e a cabeça olhando para um lado diferente, com uma respiração lenta;
-    ///  2. braços dobrados por IK de dois ossos até o leque;
-    ///  3. mãos viradas para segurar o leque por trás (dedos para cima, palma para quem segura).
-    /// Tudo varia por personagem a partir do nome do modelo, sempre igual para o mesmo personagem.
-    /// No boneco de formas simples o leque só fica na frente dele.
+    ///     deixa todos com o ombro caído) e a cabeça olhando para um lado, com uma respiração lenta;
+    ///  2. o jeito de segurar (<see cref="HoldStyle"/>) decide onde fica o leque e o que cada mão faz: segura o leque
+    ///     por trás (dedos para cima, palma para quem segura) ou descansa na mesa com a palma para baixo;
+    ///  3. braços dobrados por IK de dois ossos e mãos viradas para isso.
+    /// O jeito vem do personagem (<see cref="StyleOf"/>) e o resto é sorteado pelo nome do modelo, sempre igual para
+    /// o mesmo personagem. No boneco de formas simples o leque só fica na frente dele.
     /// </summary>
     public class CardHolder : MonoBehaviour
     {
@@ -23,16 +37,28 @@ namespace Cacheta.App
         /// <summary>Quantas cartas estão na mão (sem cartas, os braços descansam na pose da animação).</summary>
         public int Cards { get; set; } = 9;
 
+        /// <summary>Jeito de segurar as cartas.</summary>
+        public HoldStyle Style { get; set; }
+
         /// <summary>Tamanho das cartas na mão dos personagens (iguais às suas).</summary>
         public const float CardW = 0.085f, CardH = 0.125f;
 
-        // O leque nunca desce até a mesa: o centro dele fica pelo menos isto acima do tampo.
-        private const float FanAboveTable = 0.15f;
-        // Pulsos em relação ao leque: para o lado, para baixo e para trás das cartas (do lado da mesa). Os dedos cobrem
-        // só a parte de baixo das cartas, como quem segura um leque de verdade.
-        private const float WristSide = 0.13f, WristDown = 0.19f, WristBehind = 0.02f;
-        // Quanto os dedos apontam para o meio do leque (0 = retos para cima).
-        private const float FingersInward = 0.45f;
+        /// <summary>O jeito de cada personagem (pelo nome do modelo); quem não está aqui sorteia um.</summary>
+        public static HoldStyle? StyleOf(string model)
+        {
+            switch (model)
+            {
+                case "TioBeto": return HoldStyle.Mesa;
+                case "DonaCleide": return HoldStyle.Duas;
+                case "Marcela": return HoldStyle.Alto;
+                case "Ramiro": return HoldStyle.Cotovelo;
+                case "Marquinho": return HoldStyle.Alto;
+                case "Ana": return HoldStyle.Mesa;
+                case "LittleTiger":
+                case "LittleTigerRevelado": return HoldStyle.Cotovelo;
+                default: return null;
+            }
+        }
 
         private Transform _body;
         private Arm _left, _right;
@@ -42,7 +68,10 @@ namespace Cacheta.App
         private readonly List<Guard> _guards = new List<Guard>();
 
         // Jeito de cada um (sorteado pelo nome, fixo por personagem).
-        private float _lean, _twist, _shrug, _lookYaw, _lookPitch, _fanForward, _fanDown, _fanTilt, _fanYaw, _spread, _phase;
+        private uint _seed;
+        private int _holdSide; // nos jeitos de uma mão: -1 esquerda, +1 direita
+        private float _lean, _twist, _shrug, _lookYaw, _lookPitch, _fanTilt, _fanYaw, _spread, _phase;
+        private Vector3 _elbowOnTable;
 
         private class Arm
         {
@@ -95,18 +124,24 @@ namespace Cacheta.App
             Fan.SetParent(_body.parent != null ? _body.parent : _body, false);
 
             // O mesmo sorteio da prévia (o nome do arquivo do modelo decide o jeito de cada um).
-            uint seed = Hash(name + ".glb");
-            _lean = 4 + R(seed, 1) * 12;              // graus para a frente (0 = reto)
-            _twist = (R(seed, 2) - 0.5f) * 14;        // giro do tronco
-            _shrug = 10 + R(seed, 3) * 8;             // levanta os ombros
-            _lookYaw = (R(seed, 4) - 0.5f) * 40;      // para que lado olha
-            _lookPitch = 8 + R(seed, 5) * 14;         // quanto olha para baixo
-            _fanForward = 0.27f + R(seed, 6) * 0.07f;
-            _fanDown = 0.03f + R(seed, 7) * 0.06f;
-            _fanTilt = 8 + R(seed, 8) * 8;
-            _spread = 0.032f + R(seed, 9) * 0.004f;
-            _fanYaw = (R(seed, 10) - 0.5f) * 16;
-            _phase = R(seed, 11) * 6.28f;
+            _seed = Hash(name + ".glb");
+            Style = StyleOf(name) ?? (HoldStyle)(_seed % 4);
+            _holdSide = R(_seed, 12) < 0.5f ? -1 : 1;
+            bool oneHand = Style != HoldStyle.Duas;
+            _lean = 4 + R(_seed, 1) * 12 + (Style == HoldStyle.Mesa || Style == HoldStyle.Cotovelo ? 6 : 0);
+            _twist = (R(_seed, 2) - 0.5f) * 14 + (oneHand ? _holdSide * 8 : 0);
+            _shrug = 10 + R(_seed, 3) * 8;
+            _lookYaw = (R(_seed, 4) - 0.5f) * (Style == HoldStyle.Mesa ? 20 : 40);
+            _lookPitch = Style == HoldStyle.Mesa ? 20 + R(_seed, 5) * 6
+                       : Style == HoldStyle.Alto ? 2 + R(_seed, 5) * 6
+                       : 8 + R(_seed, 5) * 14;
+            _fanTilt = Style == HoldStyle.Alto ? 4 + R(_seed, 8) * 8
+                     : Style == HoldStyle.Mesa ? 36 + R(_seed, 8) * 8
+                     : Style == HoldStyle.Cotovelo ? 10
+                     : 8 + R(_seed, 8) * 8;
+            _spread = Style == HoldStyle.Duas ? 0.032f + R(_seed, 9) * 0.004f : 0.026f;
+            _fanYaw = (R(_seed, 10) - 0.5f) * 16 + (oneHand ? _holdSide * 8 : 0);
+            _phase = R(_seed, 11) * 6.28f;
         }
 
         private void OnDestroy()
@@ -166,20 +201,38 @@ namespace Cacheta.App
                 Posture(fwd, right, up);
             }
 
-            // Leque: na frente do peito, abaixo da linha dos ombros, cada um com a sua altura, inclinação e giro.
-            var shoulders = _rig ? (_left.Upper.position + _right.Upper.position) / 2 : body.position + up * 0.85f;
-            var fan = shoulders + fwd * _fanForward - up * _fanDown;
-            fan.y = Mathf.Max(fan.y, TableProps.TableTop + FanAboveTable);
+            // Leque: cada jeito põe ele num lugar, com a sua inclinação e um leve giro.
+            var sh = _rig ? (_left.Upper.position + _right.Upper.position) / 2 : body.position + up * 0.85f;
+            Vector3 fan;
+            switch (Style)
+            {
+                case HoldStyle.Alto:
+                    fan = sh + fwd * 0.3f + right * (_holdSide * 0.06f) + up * (0.02f + R(_seed, 7) * 0.06f);
+                    break;
+                case HoldStyle.Mesa:
+                    fan = sh + fwd * 0.46f + right * (_holdSide * 0.05f);
+                    fan.y = TableProps.TableTop + 0.1f;
+                    break;
+                case HoldStyle.Cotovelo:
+                    _elbowOnTable = sh + right * (_holdSide * 0.12f) + fwd * 0.4f;
+                    _elbowOnTable.y = TableProps.TableTop + 0.03f;
+                    fan = _elbowOnTable + up * 0.28f - fwd * 0.12f;
+                    break;
+                default:
+                    fan = sh + fwd * (0.27f + R(_seed, 6) * 0.07f) - up * (0.03f + R(_seed, 7) * 0.06f);
+                    fan.y = Mathf.Max(fan.y, TableProps.TableTop + 0.15f);
+                    break;
+            }
             Fan.position = fan;
             var fanDir = (fwd + right * Mathf.Tan(_fanYaw * Mathf.Deg2Rad)).normalized;
-            // O verso das cartas fica virado para a mesa; o topo do leque inclina um pouco para quem segura.
+            // O verso das cartas fica virado para a mesa; o topo do leque inclina para quem segura.
             Fan.rotation = Quaternion.LookRotation(-fanDir, up) * Quaternion.Euler(_fanTilt, 0, 0);
 
             if (!_rig) return;
             if (Cards > 0)
             {
-                HoldWith(_left, -1, right, up, fwd);
-                HoldWith(_right, 1, right, up, fwd);
+                UseArm(_left, -1, sh, right, up, fwd);
+                UseArm(_right, 1, sh, right, up, fwd);
             }
             foreach (var g in _guards) g.Set = g.Bone.localRotation;
         }
@@ -221,15 +274,50 @@ namespace Cacheta.App
             clavicle.rotation = Quaternion.FromToRotation(d, raised) * clavicle.rotation;
         }
 
-        /// <summary>Leva o pulso para trás do leque (IK) e vira a mão para segurar as cartas.</summary>
-        private void HoldWith(Arm arm, int side, Vector3 right, Vector3 up, Vector3 fwd)
+        /// <summary>
+        /// Decide o que o braço faz (segura o leque por trás ou descansa na mesa), leva o pulso até lá com IK e vira a
+        /// mão.
+        /// </summary>
+        private void UseArm(Arm arm, int side, Vector3 sh, Vector3 right, Vector3 up, Vector3 fwd)
         {
             var fY = Fan.up;
             var fZ = Fan.forward; // para quem segura
-            var wrist = Fan.position + right * (side * WristSide) - fY * WristDown - fZ * WristBehind;
-            var pole = arm.Upper.position + right * (side * 0.3f) - up * 0.5f - fwd * 0.05f;
+            bool both = Style == HoldStyle.Duas;
+            Vector3 wrist, pole, fingers, palm;
+            if (both)
+            {
+                // As duas mãos seguram os lados do leque; os dedos cobrem só a parte de baixo das cartas.
+                wrist = Fan.position + right * (side * 0.13f) - fY * 0.19f - fZ * 0.02f;
+                pole = arm.Upper.position + right * (side * 0.3f) - up * 0.5f - fwd * 0.05f;
+                fingers = (fY - right * (side * 0.45f)).normalized;
+                palm = fZ;
+            }
+            else if (side == _holdSide)
+            {
+                // Uma mão só segura o leque por baixo, pelo meio.
+                wrist = Fan.position + right * (side * 0.03f) - fY * (Style == HoldStyle.Mesa ? 0.12f : 0.17f) - fZ * 0.02f;
+                pole = Style == HoldStyle.Cotovelo
+                    ? _elbowOnTable - up * 0.3f + fwd * 0.1f
+                    : arm.Upper.position + right * (side * 0.3f) - up * 0.5f - fwd * 0.05f;
+                fingers = (fY - right * (side * 0.15f)).normalized;
+                palm = fZ;
+            }
+            else
+            {
+                // A outra mão descansa na mesa, com a palma para baixo e os dedos para o meio da mesa.
+                wrist = sh + right * (side * 0.17f) + fwd * 0.44f;
+                wrist.y = TableProps.TableTop + 0.04f;
+                pole = arm.Upper.position + right * (side * 0.35f) - up * 0.3f;
+                fingers = (fwd - right * (side * 0.35f)).normalized;
+                palm = -up;
+            }
             TwoBoneIK.Solve(arm.Upper, arm.Lower, arm.Hand, wrist, pole);
+            OrientHand(arm, fingers, palm);
+        }
 
+        /// <summary>Vira a mão para os dedos apontarem em <paramref name="fingers"/> com a palma para <paramref name="palm"/>.</summary>
+        private void OrientHand(Arm arm, Vector3 fingers, Vector3 palm)
+        {
             if (_skin == null || arm.LowerIndex < 0 || arm.HandIndex < 0) return;
             // Pose de origem (A-pose) da mão: dedos na direção do antebraço e palma virada para o meio do corpo.
             var toWorld = _skin.transform.localToWorldMatrix;
@@ -241,10 +329,6 @@ namespace Cacheta.App
             var meshX = _skin.transform.TransformDirection(Vector3.right).normalized;
             float hx = Vector3.Dot(pHand - _skin.transform.position, meshX);
             var palmBind = meshX * (hx > 0 ? -1f : 1f);
-
-            // Agora: dedos para cima pelo verso das cartas (um pouco para o meio do leque), palma para quem segura.
-            var fingers = (fY - right * (side * FingersInward)).normalized;
-            var palm = fZ;
             arm.Hand.rotation = Quaternion.LookRotation(fingers, palm)
                                 * Quaternion.Inverse(Quaternion.LookRotation(fingersBind, palmBind))
                                 * bindHand.rotation;
