@@ -114,10 +114,8 @@ namespace Cacheta.App
                 {
                     var src = mats[i];
                     if (src == null) continue;
-                    Texture tex = null;
-                    if (src.HasProperty("baseColorTexture")) tex = src.GetTexture("baseColorTexture");
-                    if (tex == null && src.HasProperty("_BaseMap")) tex = src.GetTexture("_BaseMap");
-                    if (tex == null && src.HasProperty("_MainTex")) tex = src.mainTexture;
+                    var tex = BaseTexture(src);
+                    if (tex == null) Debug.LogWarning($"[Carteado] {go.name}: não achei a textura no material \"{src.name}\" (shader {src.shader.name}).");
                     Color tint = Color.white;
                     if (src.HasProperty("baseColorFactor")) tint = src.GetColor("baseColorFactor");
                     else if (src.HasProperty("_BaseColor")) tint = src.GetColor("_BaseColor");
@@ -129,6 +127,23 @@ namespace Cacheta.App
                 r.sharedMaterials = mats;
                 if (r is SkinnedMeshRenderer smr) smr.updateWhenOffscreen = true;
             }
+        }
+
+        /// <summary>
+        /// A textura de cor do material importado. O nome da propriedade muda conforme a versão do glTFast e o
+        /// shader escolhido (baseColorTexture, _BaseMap, _MainTex...), então procura pelos nomes conhecidos e,
+        /// se não achar, pega a primeira textura que o material tiver.
+        /// </summary>
+        private static Texture BaseTexture(Material src)
+        {
+            foreach (var name in new[] { "baseColorTexture", "_BaseColorTexture", "_BaseMap", "_MainTex", "_BaseColorMap", "_Albedo" })
+                if (src.HasProperty(name) && src.GetTexture(name) != null) return src.GetTexture(name);
+            foreach (var id in src.GetTexturePropertyNameIDs())
+            {
+                var t = src.GetTexture(id);
+                if (t != null) return t;
+            }
+            return src.mainTexture;
         }
 
         /// <summary>Escala para a altura padrão e apoia os pés no chão (y = 0 do pai).</summary>
