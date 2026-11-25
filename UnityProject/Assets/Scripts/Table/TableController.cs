@@ -647,12 +647,11 @@ namespace Cacheta.App
                     {
                         var g = NewCardQuad("Verso", parent, keepCollider: false);
                         g.GetComponent<Renderer>().sharedMaterial = BackMat;
-                        g.transform.localScale = new Vector3(CardW * 0.8f, CardH * 0.8f, 1);
                         float x = (i - (want - 1) / 2f) * 0.021f;
-                        g.transform.localPosition = new Vector3(x, -x * x * 2f, -i * 0.0015f);
-                        g.transform.localRotation = Quaternion.Euler(0, 0, -x * 200f);
-                        if (holder == null)
+                        if (holder != null) holder.LayCard(g.transform, i, want);
+                        else
                         {
+                            g.transform.localScale = new Vector3(CardW * 0.8f, CardH * 0.8f, 1);
                             var toCenter = (-_seatPos[s]).normalized;
                             g.transform.position = HeldAnchor(s) + Vector3.Cross(Vector3.up, toCenter).normalized * x;
                             g.transform.rotation = Quaternion.LookRotation(-toCenter, Vector3.up) * Quaternion.Euler(-15, 0, x * 200f);
@@ -679,7 +678,7 @@ namespace Cacheta.App
             if (seat == Me) return HandCenter;
             if (_holders[seat] != null) return _holders[seat].Fan.position;
             var toCenter = (-_seatPos[seat]).normalized;
-            return _seatPos[seat] + toCenter * 0.36f + Vector3.up * (TableTop + 0.11f);
+            return _seatPos[seat] + toCenter * 0.36f + Vector3.up * (TableTop + 0.15f);
         }
 
         private void Fly(Card? face, Vector3 from, Vector3 to, bool toDiscard)

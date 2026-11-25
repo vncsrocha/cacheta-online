@@ -18,21 +18,37 @@ namespace Cacheta.App
 
         public static void Table(Transform world, EnvironmentLook look)
         {
-            // Tampo com borda arredondada e uma saia, quatro pés abertos e travessas (mesa de plástico de bar).
-            Palette.Prim(PrimitiveType.Cylinder, world, new Vector3(0, TableTop - 0.015f, 0), new Vector3(TableRadius * 2, 0.015f, TableRadius * 2), look.Table, "Tampo");
-            Palette.Prim(PrimitiveType.Cylinder, world, new Vector3(0, TableTop - 0.045f, 0), new Vector3(TableRadius * 2 + 0.03f, 0.03f, TableRadius * 2 + 0.03f), look.TableEdge, "Borda");
-            Palette.Prim(PrimitiveType.Cylinder, world, new Vector3(0, TableTop - 0.07f, 0), new Vector3(TableRadius * 1.7f, 0.015f, TableRadius * 1.7f), look.TableEdge, "Saia");
-            float footR = TableRadius * 0.62f, legH = TableTop - 0.07f;
+            // Mesa de plástico: tampo torneado com um rebordo arredondado (a borda dobrada para baixo, oca por
+            // baixo), um cubo no meio e quatro pernas cônicas um pouco abertas, entre as cadeiras.
+            float r = TableRadius, t = TableTop;
+            var top = MeshKit.Lathe("Tampo " + r + " " + t, new[]
+            {
+                new Vector2(0, t), new Vector2(r - 0.04f, t), new Vector2(r - 0.04f, t),
+                new Vector2(r - 0.028f, t + 0.005f), new Vector2(r - 0.014f, t + 0.007f), new Vector2(r - 0.004f, t),
+                new Vector2(r, t - 0.014f), new Vector2(r - 0.003f, t - 0.03f), new Vector2(r - 0.012f, t - 0.04f),
+                new Vector2(r - 0.024f, t - 0.041f), new Vector2(r - 0.03f, t - 0.032f), new Vector2(r - 0.03f, t - 0.022f),
+                new Vector2(r - 0.03f, t - 0.022f), new Vector2(0, t - 0.022f),
+            }, 72);
+            MeshKit.Piece(top, world, Vector3.zero, look.Table, "Tampo");
+            var hub = MeshKit.Lathe("Cubo " + t, new[]
+            {
+                new Vector2(0.16f, t - 0.022f), new Vector2(0.16f, t - 0.1f), new Vector2(0.16f, t - 0.1f), new Vector2(0, t - 0.1f),
+            }, 32);
+            MeshKit.Piece(hub, world, Vector3.zero, look.TableEdge, "Cubo");
             for (int i = 0; i < 4; i++)
             {
-                float a = (45f + i * 90f) * Mathf.Deg2Rad;
+                float a = (22.5f + i * 90f) * Mathf.Deg2Rad;
                 var dir = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
-                // O pé sai de baixo da saia e abre um pouco até o chão.
-                var top = dir * (footR - 0.08f) + Vector3.up * legH;
-                var bottom = dir * footR;
-                var leg = Palette.Prim(PrimitiveType.Cylinder, world, (top + bottom) / 2, new Vector3(0.06f, (top - bottom).magnitude / 2, 0.06f), look.Table, "Pé");
-                leg.transform.localRotation = Quaternion.FromToRotation(Vector3.up, top - bottom);
-                Palette.Prim(PrimitiveType.Cylinder, world, bottom + Vector3.up * 0.01f, new Vector3(0.09f, 0.01f, 0.09f), look.TableEdge, "Sapata");
+                var upper = dir * 0.55f + Vector3.up * (t - 0.03f);
+                var foot = dir * 0.68f;
+                float len = (upper - foot).magnitude;
+                var leg = MeshKit.Lathe("Perna " + len, new[]
+                {
+                    new Vector2(0.032f, len), new Vector2(0.022f, 0.03f), new Vector2(0.03f, 0.012f),
+                    new Vector2(0.03f, 0f), new Vector2(0.03f, 0f), new Vector2(0, 0f),
+                }, 20);
+                var g = MeshKit.Piece(leg, world, foot, look.TableEdge, "Perna");
+                g.transform.localRotation = Quaternion.FromToRotation(Vector3.up, upper - foot);
             }
         }
 
@@ -84,7 +100,8 @@ namespace Cacheta.App
             for (int p = includeMine ? 0 : 1; p < Places; p++) Chair(world, Place(p), look, "Cadeira " + p);
         }
 
-        /// <summary>Cadeira de plástico com braços, do tamanho de uma de verdade.</summary>
+        /// <summary>Cadeira com braços: a monobloco de plástico se o cenário pedir (e o modelo estiver baixado), senão
+        /// uma de formas simples do mesmo tamanho.</summary>
         public static Transform Chair(Transform world, Vector3 seat, EnvironmentLook look, string name = "Cadeira")
         {
             var chair = new GameObject(name).transform;
@@ -93,6 +110,8 @@ namespace Cacheta.App
             chair.rotation = Facing(seat);
             var c = look.Chair;
             float y = SeatHeight;
+            // Cadeira de plástico monobloco de verdade (modelo gratuito baixado pelo Unity), quando o cenário pede.
+            if (look.Monobloc && Monobloco.Build(chair, c, y, "Monobloco") != null) return chair;
             // Assento (a frente da cadeira é +Z, virada para a mesa)
             Palette.Prim(PrimitiveType.Cube, chair, new Vector3(0, y - 0.015f, 0), new Vector3(0.46f, 0.03f, 0.44f), c, "Assento");
             // Encosto inclinado para trás
@@ -115,7 +134,7 @@ namespace Cacheta.App
         }
 
         /// <summary>Dá um leque de cartas viradas para baixo a quem está sentado (tela do elenco).</summary>
-        public static void HoldBacks(GameObject seated, int cards, float cardW = 0.068f, float cardH = 0.1f)
+        public static void HoldBacks(GameObject seated, int cards)
         {
             var holder = seated.GetComponentInChildren<CardHolder>();
             if (holder == null) return;
@@ -128,10 +147,7 @@ namespace Cacheta.App
                 g.name = "Verso";
                 g.transform.SetParent(holder.Fan, false);
                 g.GetComponent<Renderer>().sharedMaterial = mat;
-                float x = (i - (cards - 1) / 2f) * 0.021f;
-                g.transform.localScale = new Vector3(cardW, cardH, 1);
-                g.transform.localPosition = new Vector3(x, -x * x * 2f, -i * 0.0015f);
-                g.transform.localRotation = Quaternion.Euler(0, 0, -x * 200f);
+                holder.LayCard(g.transform, i, cards);
             }
         }
 

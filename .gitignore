@@ -21,3 +21,7 @@ UnityProject/*.sln
 UnityProject/Assets/Resources/Personagens/*.glb
 UnityProject/Assets/Resources/Personagens/*.glb.meta
 UnityProject/Assets/Resources/Personagens/.baixados.txt
+
+# Móveis 3D gratuitos (Poly Haven, CC0): baixados pelo próprio Unity (menu Carteado > Baixar móveis 3D)
+UnityProject/Assets/Resources/Moveis/*.bytes
+UnityProject/Assets/Resources/Moveis/*.bytes.meta

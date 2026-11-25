@@ -10,6 +10,8 @@ namespace Cacheta.App
         public Color Table;
         public Color TableEdge;
         public Color Chair;
+        /// <summary>Usa a cadeira de plástico monobloco (modelo 3D) em vez da cadeira de formas simples.</summary>
+        public bool Monobloc;
     }
 
     /// <summary>
@@ -210,14 +212,14 @@ namespace Cacheta.App
             Tv(P(r, "o7"), new Vector3(W - 0.1f, 2.45f, 1.6f));
             Crates(P(r, "o8"), new Vector3(4.55f, 0, -0.6f), 3, new[] { new Color(0.95f, 0.78f, 0.1f), new Color(0.88f, 0.26f, 0.2f) });
             Crates(P(r, "o9"), new Vector3(4.55f, 0, -1.35f), 2, new[] { new Color(0.88f, 0.26f, 0.2f), new Color(0.95f, 0.78f, 0.1f) });
-            StackedChairs(P(r, "o10"), new Vector3(4.3f, 0, -3.8f), new Color(0.98f, 0.8f, 0.12f), 4);
+            StackedChairs(P(r, "o10"), new Vector3(4.3f, 0, -3.8f), PlasticWhite, 4, monobloc: true);
             Poster(P(r, "o11"), Side.Direita, -2.6f, 1.9f, 0.7f, 1.0f, new Color(0.98f, 0.95f, 0.85f), new Color(0.2f, 0.55f, 0.3f));
             TubeLight(P(r, "o12"), new Vector3(-2.2f, H, 0.2f), true);
             TubeLight(P(r, "o13"), new Vector3(2.2f, H, -1.6f), true);
             Fan(P(r, "o14"), new Vector3(0, H, 0.6f), new Color(0.9f, 0.9f, 0.88f));
 
-            var plastic = new Color(0.98f, 0.8f, 0.12f);
-            return new EnvironmentLook { Table = plastic, TableEdge = new Color(0.88f, 0.66f, 0.08f), Chair = plastic };
+            // Mesa e cadeiras de plástico branco, de bar.
+            return new EnvironmentLook { Table = PlasticWhite, TableEdge = new Color(0.86f, 0.86f, 0.84f), Chair = PlasticWhite, Monobloc = true };
         }
 
         // ================================================================== 2. Dona Cleide: salão de bingo do bairro
@@ -858,8 +860,20 @@ namespace Cacheta.App
             }
         }
 
-        private static void StackedChairs(Transform r, Vector3 pos, Color c, int n)
+        private static readonly Color PlasticWhite = new Color(0.96f, 0.96f, 0.94f);
+
+        private static void StackedChairs(Transform r, Vector3 pos, Color c, int n, bool monobloc = false)
         {
+            if (monobloc && Monobloco.Available)
+            {
+                // Monoblocos empilhados: cada uma encaixa na de baixo, um pouco mais alta e para trás.
+                for (int i = 0; i < n; i++)
+                {
+                    var g = Monobloco.Build(r, c, TableProps.SeatHeight, i == 0 ? "Cadeiras empilhadas" : "Cadeira empilhada");
+                    g.transform.localPosition = pos + new Vector3(0, i * 0.075f, -i * 0.025f);
+                }
+                return;
+            }
             for (int i = 0; i < n; i++)
             {
                 Box(r, pos + new Vector3(0, 0.44f + i * 0.09f, 0), new Vector3(0.5f, 0.05f, 0.48f), c, "Cadeira empilhada");
