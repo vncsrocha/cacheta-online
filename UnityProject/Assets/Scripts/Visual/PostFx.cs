@@ -22,9 +22,9 @@ namespace Cacheta.App
         /// <summary>Boteco à tarde: lâmpadas que brilham, cor quente, cantos puxando para o marrom.</summary>
         public static PostLook Boteco => new PostLook
         {
-            Bloom = 0.85f, Threshold = 0.95f, BloomTint = new Color(1f, 0.93f, 0.8f), Exposure = 1.0f,
-            WhiteBalance = new Color(1.04f, 1.0f, 0.9f), Saturation = 1.1f, Contrast = 1.06f,
-            Vignette = 0.38f, VignetteColor = new Color(0.42f, 0.27f, 0.17f),
+            Bloom = 0.4f, Threshold = 1.15f, BloomTint = new Color(1f, 0.9f, 0.72f), Exposure = 0.9f,
+            WhiteBalance = new Color(1.07f, 1.0f, 0.84f), Saturation = 1.12f, Contrast = 1.1f,
+            Vignette = 0.5f, VignetteColor = new Color(0.45f, 0.28f, 0.16f),
         };
     }
 

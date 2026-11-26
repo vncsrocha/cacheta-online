@@ -185,7 +185,7 @@ namespace Cacheta.App
                 Wall = Color.white, WallTex = Art("Bar/parede"), WallTile = 2f,
                 Wainscot = Color.white, WainscotTex = Art("Bar/azulejo") ?? Grid(new Color(0.36f, 0.64f, 0.56f), new Color(0.9f, 0.92f, 0.88f)),
                 WainscotTile = 0.6f, WainscotHeight = 1.4f, WainscotTrim = new Color(0.16f, 0.42f, 0.34f),
-                Ceiling = Color.white, CeilingTex = Art("Bar/forro"), CeilingTile = 1f, Trim = new Color(0.55f, 0.57f, 0.6f),
+                Ceiling = new Color(0.94f, 0.87f, 0.74f), CeilingTex = Art("Bar/forro"), CeilingTile = 1f, Trim = new Color(0.55f, 0.57f, 0.6f),
                 SunPatch = new Color(0.98f, 0.62f, 0.44f, 1f),
             };
             if (s.WallTex == null) s.Wall = new Color(0.96f, 0.88f, 0.64f);
@@ -306,11 +306,32 @@ namespace Cacheta.App
             Lamp(g, new Vector3(0, 0.3f, 1.1f), new Color(0.62f, 0.82f, 1f), 0.7f, 2.4f);
         }
 
-        /// <summary>Luminária com duas lâmpadas fluorescentes, acesa (com brilho e luz de verdade).</summary>
+        /// <summary>
+        /// Luminária de boteco: calha de metal com duas lâmpadas fluorescentes acesas, que brilham acima do branco (o
+        /// pós-efeito espalha o brilho) e esquentam a sala com uma luz de verdade.
+        /// </summary>
         private static void TubeLamp(Transform r, Vector3 ceiling)
         {
-            if (Prop(r, "Luminaria", ceiling, 0f, 1f, shadows: false) == null) TubeLight(r, ceiling, true);
-            Lamp(r, ceiling - new Vector3(0, 0.35f, 0), new Color(1f, 0.93f, 0.8f), 1.9f, 7f);
+            var g = Group(r, ceiling, 0f, "Luminária");
+            NoShadow(Box(g, new Vector3(0, -0.025f, 0), new Vector3(1.3f, 0.05f, 0.17f), new Color(0.86f, 0.86f, 0.84f), "Calha"));
+            for (int i = -1; i <= 1; i += 2)
+            {
+                var tube = Palette.Prim(PrimitiveType.Cylinder, g, new Vector3(0, -0.075f, i * 0.045f), new Vector3(0.034f, 0.6f, 0.034f), Color.white, "Lâmpada");
+                tube.transform.localRotation = Quaternion.Euler(0, 0, 90f);
+                Shine(tube, new Color(1f, 0.96f, 0.86f), 2.4f);
+            }
+            Lamp(r, ceiling - new Vector3(0, 0.6f, 0), new Color(1f, 0.88f, 0.7f), 1.2f, 6.5f);
+        }
+
+        /// <summary>Faz a peça brilhar sozinha acima do branco (lâmpadas): o pós-efeito transforma o excesso em brilho.</summary>
+        private static void Shine(GameObject go, Color c, float strength)
+        {
+            var m = Palette.ToonTextured(null, c);
+            m.SetColor("_EmissionColor", c * strength);
+            m.SetFloat("_OutlineWidth", 0f);
+            var rend = go.GetComponent<Renderer>();
+            rend.sharedMaterial = m;
+            rend.shadowCastingMode = ShadowCastingMode.Off;
         }
 
         /// <summary>Cavalete de giz na calçada, com o prato do dia (as duas tábuas em A).</summary>
