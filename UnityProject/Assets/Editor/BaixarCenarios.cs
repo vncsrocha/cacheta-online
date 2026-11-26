@@ -28,7 +28,7 @@ namespace Cacheta.EditorTools
         /// </summary>
         private static readonly (string Nome, string Url)[] Pacotes =
         {
-            ("BarDoTioBeto", "URL_BAR_DO_TIO_BETO"),
+            ("BarDoTioBeto", "https://d2ol7oe51mr4n9.cloudfront.net/user_33DfferL9wsklzrcrzf0ZWRxQMf/d6d476d1-3a6e-4017-9f89-e6bee9dd1b07.glb"),
         };
 
         private static bool _rodando;
