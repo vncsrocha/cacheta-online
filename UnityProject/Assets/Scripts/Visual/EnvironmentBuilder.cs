@@ -186,7 +186,7 @@ namespace Cacheta.App
                 Wainscot = Color.white, WainscotTex = Art("Bar/azulejo") ?? Grid(new Color(0.36f, 0.64f, 0.56f), new Color(0.9f, 0.92f, 0.88f)),
                 WainscotTile = 0.6f, WainscotHeight = 1.4f, WainscotTrim = new Color(0.16f, 0.42f, 0.34f),
                 Ceiling = new Color(0.94f, 0.87f, 0.74f), CeilingTex = Art("Bar/forro"), CeilingTile = 1f, Trim = new Color(0.55f, 0.57f, 0.6f),
-                SunPatch = new Color(0.98f, 0.62f, 0.44f, 1f),
+                // Sem mancha de sol no chão: a luz aqui dentro é das lâmpadas (e a mancha cobria o ladrilho).
             };
             if (s.WallTex == null) s.Wall = new Color(0.96f, 0.88f, 0.64f);
             if (s.CeilingTex == null) s.Ceiling = new Color(0.93f, 0.9f, 0.84f);
@@ -320,7 +320,7 @@ namespace Cacheta.App
                 tube.transform.localRotation = Quaternion.Euler(0, 0, 90f);
                 Shine(tube, new Color(1f, 0.96f, 0.86f), 2.4f);
             }
-            Lamp(r, ceiling - new Vector3(0, 0.6f, 0), new Color(1f, 0.88f, 0.7f), 1.2f, 6.5f);
+            Lamp(r, ceiling - new Vector3(0, 0.6f, 0), new Color(1f, 0.88f, 0.7f), 1.05f, 6.5f);
         }
 
         /// <summary>Faz a peça brilhar sozinha acima do branco (lâmpadas): o pós-efeito transforma o excesso em brilho.</summary>
