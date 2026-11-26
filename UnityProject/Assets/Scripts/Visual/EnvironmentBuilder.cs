@@ -320,7 +320,8 @@ namespace Cacheta.App
                 tube.transform.localRotation = Quaternion.Euler(0, 0, 90f);
                 Shine(tube, new Color(1f, 0.96f, 0.86f), 2.4f);
             }
-            Lamp(r, ceiling - new Vector3(0, 0.6f, 0), new Color(1f, 0.88f, 0.7f), 1.05f, 6.5f);
+            // A luz fica um metro abaixo: perto do teto ela faria uma mancha estourada em volta da luminária.
+            Lamp(r, ceiling - new Vector3(0, 1.0f, 0), new Color(1f, 0.88f, 0.7f), 1.05f, 6.5f);
         }
 
         /// <summary>Faz a peça brilhar sozinha acima do branco (lâmpadas): o pós-efeito transforma o excesso em brilho.</summary>

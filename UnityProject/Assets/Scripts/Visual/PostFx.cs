@@ -35,7 +35,8 @@ namespace Cacheta.App
     [RequireComponent(typeof(Camera))]
     public sealed class PostFx : MonoBehaviour
     {
-        private const int MaxMips = 6;
+        // Quatro reduções: o brilho fica perto da lâmpada (com mais, vira uma mancha larga no teto).
+        private const int MaxMips = 4;
         private PostLook _look;
         private Material _mat;
         private readonly RenderTexture[] _mips = new RenderTexture[MaxMips];
