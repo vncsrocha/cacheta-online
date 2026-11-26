@@ -1,0 +1,8 @@
+# Gerados ou baixados: refaça com os passos do LEIAME.md
+node_modules/
+package-lock.json
+ph/
+ia3d/
+out/
+tex/
+*.glb

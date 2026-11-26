@@ -138,7 +138,7 @@ namespace Cacheta.App
         /// shader escolhido (baseColorTexture, _BaseMap, _MainTex...), então procura pelos nomes conhecidos e,
         /// se não achar, pega a primeira textura que o material tiver.
         /// </summary>
-        private static Texture BaseTexture(Material src)
+        public static Texture BaseTexture(Material src)
         {
             foreach (var name in new[] { "baseColorTexture", "_BaseColorTexture", "_BaseMap", "_MainTex", "_BaseColorMap", "_Albedo" })
                 if (src.HasProperty(name) && src.GetTexture(name) != null) return src.GetTexture(name);
