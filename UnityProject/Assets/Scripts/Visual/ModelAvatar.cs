@@ -11,8 +11,8 @@ namespace Cacheta.App
     {
         public const string Folder = "Personagens/";
 
-        /// <summary>Altura no jogo de uma pessoa de 1,75 m (mesma escala do personagem de formas simples e da mesa).</summary>
-        public const float StandingHeight = 1.95f;
+        /// <summary>Altura no jogo de uma pessoa de 1,75 m. O mundo está em metros de verdade.</summary>
+        public const float StandingHeight = 1.75f;
         public const float ReferenceHeight = 1.75f;
 
         public static bool Exists(string model)
@@ -33,7 +33,11 @@ namespace Cacheta.App
             ToonMaterials(go);
             FitHeight(go, StandingHeight * (heightMeters > 0.5f ? heightMeters : ReferenceHeight) / ReferenceHeight);
 
-            if (seated) Sit(go, model);
+            if (seated)
+            {
+                Sit(go, model);
+                go.AddComponent<CardHolder>(); // segura as cartas com as duas mãos
+            }
             else
             {
                 var anim = go.GetComponentInChildren<Animation>();
@@ -84,9 +88,9 @@ namespace Cacheta.App
         }
 
         /// <summary>Onde o quadril fica, em relação ao lugar do personagem (assento da cadeira).</summary>
-        private static readonly Vector3 SeatHips = new Vector3(0f, 0.56f, -0.02f);
+        public static readonly Vector3 SeatHips = new Vector3(0f, TableProps.SeatHeight + 0.09f, -0.06f);
 
-        private static Transform FindDeep(Transform t, string name)
+        public static Transform FindDeep(Transform t, string name)
         {
             if (t.name == name) return t;
             for (int i = 0; i < t.childCount; i++)
@@ -134,7 +138,7 @@ namespace Cacheta.App
         /// shader escolhido (baseColorTexture, _BaseMap, _MainTex...), então procura pelos nomes conhecidos e,
         /// se não achar, pega a primeira textura que o material tiver.
         /// </summary>
-        private static Texture BaseTexture(Material src)
+        public static Texture BaseTexture(Material src)
         {
             foreach (var name in new[] { "baseColorTexture", "_BaseColorTexture", "_BaseMap", "_MainTex", "_BaseColorMap", "_Albedo" })
                 if (src.HasProperty(name) && src.GetTexture(name) != null) return src.GetTexture(name);

@@ -14,20 +14,27 @@ namespace Cacheta.App
     public class TableController : MonoBehaviour
     {
         private const int Me = 0;
-        private const float TableTop = 0.8f;
-        private const float TableRadius = 1.15f;
-        private const float SeatRadius = 1.62f;
-        private const float CardW = 0.12f, CardH = 0.18f;
-        private const float HandSpacing = 0.1f;
+        private const float TableTop = TableProps.TableTop;
+        private const float TableRadius = TableProps.TableRadius;
+        private const float SeatRadius = TableProps.SeatRadius;
+        private const float CardW = 0.085f, CardH = 0.125f;   // um pouco maiores que as de verdade, para ler bem
+        // Distância entre as cartas da sua mão: juntinhas segurando, abertas no zoom.
+        private float HandSpacing => Mathf.Lerp(0.03f, 0.062f, Mathf.SmoothStep(0, 1, _zoomT));
 
         private static readonly string[] BotNames = { "Zé do Bar", "Dona Cida", "Tonhão", "Seu Juca", "Neide", "Baiano", "Rosinha" };
 
-        // Câmera: vista geral (sentado à mesa) e zoom (olhando para a mão e o centro da mesa).
-        private static readonly Vector3 OverviewPos = new Vector3(0, 1.5f, -1.95f);
-        private static readonly Vector3 OverviewLook = new Vector3(0, 0.85f, 0.4f);
-        private static readonly Vector3 ZoomPos = new Vector3(0, 1.72f, -1.62f);
-        private static readonly Vector3 ZoomLook = new Vector3(0, 0.86f, -0.45f);
-        private static readonly Vector3 HandCenter = new Vector3(0, 1.1f, -1.35f);
+        // Câmera: os seus olhos, sentado no lugar 0 (vista geral) ou inclinado olhando a mão (zoom).
+        // Tudo medido a partir da sua cadeira (em -Z, a SeatRadius do centro) e da altura da mesa; os olhos ficam
+        // na mesma altura dos olhos dos personagens sentados.
+        public static readonly Vector3 OverviewPos = new Vector3(0, TableTop + 0.43f, -SeatRadius + 0.1f);
+        public static readonly Vector3 OverviewLook = new Vector3(0, TableTop + 0.04f, 0.25f);
+        private static readonly Vector3 ZoomPos = new Vector3(0, TableTop + 0.45f, -SeatRadius + 0.18f);
+        private static readonly Vector3 ZoomLook = new Vector3(0, TableTop + 0.12f, -SeatRadius + 0.64f);
+        // As suas mãos seguram o leque aqui: na parte de baixo da vista geral (com as mãos aparecendo), e mais
+        // alto e perto do rosto no zoom.
+        private static readonly Vector3 HandLow = new Vector3(0, TableTop + 0.18f, -SeatRadius + 0.53f);
+        private static readonly Vector3 HandHigh = new Vector3(0, TableTop + 0.21f, -SeatRadius + 0.5f);
+        private Vector3 HandCenter => Vector3.Lerp(HandLow, HandHigh, Mathf.SmoothStep(0, 1, _zoomT));
 
         private GameApp _app;
         private RoomConfig _room;
@@ -40,6 +47,8 @@ namespace Cacheta.App
         // Assentos
         private Vector3[] _seatPos;
         private GameObject[] _avatars;
+        private CardHolder[] _holders;
+        private FirstPersonHands _myHands;
         private List<GameObject>[] _heldBacks;
         private Transform _turnMarker;
 
@@ -61,6 +70,8 @@ namespace Cacheta.App
         }
 
         private readonly Dictionary<int, CardView> _hand = new Dictionary<int, CardView>();
+        private Vector3 _fanLeft, _fanRight;            // pontas do seu leque (onde as suas mãos seguram)
+        private Quaternion _fanLeftRot, _fanRightRot;
         private readonly List<int> _order = new List<int>();
         private int? _selected;
         private int? _lastDrawn;
@@ -166,24 +177,28 @@ namespace Cacheta.App
         /// <summary>Você fica de frente para a mesa (-Z); os adversários se espalham do outro lado, da esquerda para a direita.</summary>
         private void BuildSeats(int players, EnvironmentLook look)
         {
+            // A mesa tem sempre as 8 cadeiras; quem não tem jogador fica vazia.
+            TableProps.Chairs(_world, look);
             _seatPos = TableProps.Seats(players);
             _avatars = new GameObject[players];
+            _holders = new CardHolder[players];
             _heldBacks = new List<GameObject>[players];
             for (int i = 1; i < players; i++)
             {
-                TableProps.Chair(_world, _seatPos[i], look, "Cadeira " + i);
                 _avatars[i] = TableProps.Seated(_profiles[i], _world, _seatPos[i]);
+                _holders[i] = _avatars[i].GetComponentInChildren<CardHolder>();
                 _heldBacks[i] = new List<GameObject>();
             }
             _heldBacks[Me] = new List<GameObject>();
+            _myHands = FirstPersonHands.Build(_profiles[Me], _world);
 
             _turnMarker = Palette.Prim(PrimitiveType.Cylinder, _world, Vector3.zero, new Vector3(0.22f, 0.004f, 0.22f), Palette.Gold, "Marcador da vez").transform;
         }
 
         private void BuildCenter()
         {
-            _stockPos = new Vector3(-0.2f, TableTop, 0.08f);
-            _discardPos = new Vector3(0.22f, TableTop, 0.08f);
+            _stockPos = new Vector3(-0.14f, TableTop, 0.02f);
+            _discardPos = new Vector3(0.15f, TableTop, 0.02f);
 
             // Vira: de face para cima, atravessada sob o monte.
             var vira = NewCardQuad("Vira", _world, keepCollider: false);
@@ -547,8 +562,10 @@ namespace Cacheta.App
             {
                 var v = _hand[_order[i]];
                 float x = (i - (n - 1) / 2f) * HandSpacing;
-                var pos = HandCenter + right * x - up * (x * x * 0.35f) + toCam * (i * 0.003f);
-                var rot = Quaternion.LookRotation(-toCam, up) * Quaternion.Euler(0, 0, -x * 35f);
+                var pos = HandCenter + right * x - up * (x * x * 0.9f) + toCam * (i * 0.002f);
+                var rot = Quaternion.LookRotation(-toCam, up) * Quaternion.Euler(0, 0, -x * 90f);
+                if (i == 0) { _fanLeft = pos; _fanLeftRot = rot; }
+                if (i == n - 1) { _fanRight = pos; _fanRightRot = rot; }
                 bool sel = _selected == v.Id;
                 if (sel) pos += rot * Vector3.up * 0.035f;
 
@@ -571,6 +588,9 @@ namespace Cacheta.App
                 v.Frame.enabled = frame.HasValue;
                 if (frame.HasValue) Palette.SetColor(v.Frame.material, frame.Value);
             }
+
+            // As suas mãos seguram as duas pontas do leque; os antebraços vêm de baixo, do seu corpo.
+            _myHands?.Place(_fanLeft, _fanLeftRot, _fanRight, _fanRightRot, n > 0, camPos, CardW, CardH, dt);
         }
 
         private void UpdateCenter()
@@ -615,21 +635,27 @@ namespace Cacheta.App
                 var st = _match.GetStatus(s);
                 int want = st == SeatStatus.Vai || st == SeatStatus.Decidindo ? _match.GetHand(s).Count : 0;
                 var list = _heldBacks[s];
+                var holder = _holders[s];
+                if (holder != null) holder.Cards = want;
                 if (list.Count != want)
                 {
                     foreach (var g in list) Destroy(g);
                     list.Clear();
-                    var anchor = HeldAnchor(s);
-                    var toCenter = (-_seatPos[s]).normalized;
+                    // O leque fica nas mãos do personagem (o CardHolder acompanha o peito e dobra os braços).
+                    var parent = holder != null ? holder.Fan : _world;
                     for (int i = 0; i < want; i++)
                     {
-                        var g = NewCardQuad("Verso", _world, keepCollider: false);
+                        var g = NewCardQuad("Verso", parent, keepCollider: false);
                         g.GetComponent<Renderer>().sharedMaterial = BackMat;
-                        g.transform.localScale = new Vector3(CardW * 0.75f, CardH * 0.75f, 1);
-                        float x = (i - (want - 1) / 2f) * 0.028f;
-                        var side = Vector3.Cross(Vector3.up, toCenter).normalized;
-                        g.transform.position = anchor + side * x - toCenter * (i * 0.002f) + Vector3.up * (-x * x * 1.5f);
-                        g.transform.rotation = Quaternion.LookRotation(-toCenter, Vector3.up) * Quaternion.Euler(-15, 0, x * 120f);
+                        float x = (i - (want - 1) / 2f) * 0.021f;
+                        if (holder != null) holder.LayCard(g.transform, i, want);
+                        else
+                        {
+                            g.transform.localScale = new Vector3(CardW * 0.8f, CardH * 0.8f, 1);
+                            var toCenter = (-_seatPos[s]).normalized;
+                            g.transform.position = HeldAnchor(s) + Vector3.Cross(Vector3.up, toCenter).normalized * x;
+                            g.transform.rotation = Quaternion.LookRotation(-toCenter, Vector3.up) * Quaternion.Euler(-15, 0, x * 200f);
+                        }
                         list.Add(g);
                     }
                 }
@@ -650,8 +676,9 @@ namespace Cacheta.App
         private Vector3 HeldAnchor(int seat)
         {
             if (seat == Me) return HandCenter;
+            if (_holders[seat] != null) return _holders[seat].Fan.position;
             var toCenter = (-_seatPos[seat]).normalized;
-            return _seatPos[seat] + toCenter * 0.42f + Vector3.up * 1.08f;
+            return _seatPos[seat] + toCenter * 0.36f + Vector3.up * (TableTop + 0.15f);
         }
 
         private void Fly(Card? face, Vector3 from, Vector3 to, bool toDiscard)
@@ -892,7 +919,7 @@ namespace Cacheta.App
         {
             for (int s = 1; s < _match.PlayerCount; s++)
             {
-                var world = _seatPos[s] + Vector3.up * 2.12f;
+                var world = _seatPos[s] + Vector3.up * 1.45f;
                 var sp = _cam.WorldToScreenPoint(world);
                 if (sp.z < 0) continue;
                 float x = sp.x / UiKit.Scale, y = (Screen.height - sp.y) / UiKit.Scale;
