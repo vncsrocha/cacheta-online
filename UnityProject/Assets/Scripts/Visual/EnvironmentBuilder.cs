@@ -52,6 +52,7 @@ namespace Cacheta.App
             public Texture2D FloorTex, WallTex, WainscotTex, CeilingTex;
             public float FloorTile = 0.5f, WallTile = 1f, WainscotTile = 0.3f, CeilingTile = 1f;
             public float WainscotHeight;          // altura do barrado (azulejo, tijolo, lambri). 0 = sem barrado
+            public Color WainscotTrim;            // filete no alto do barrado (alpha 0 = sem)
             public bool WallShadows = true;       // paredes fazem sombra no lado de fora
             public Color SunPatch;                // cor da mancha de sol que entra pelas aberturas (alpha 0 = sem)
             public float SunPatchDepth = 2.2f;
@@ -73,6 +74,9 @@ namespace Cacheta.App
             F = sala != null && sala.frente < -1 ? sala.frente : -7.6f;
             H = sala != null && sala.pe > 2 ? sala.pe : 3.4f;
             _pieces.Clear();
+            _pack = id.ToString();
+            // Só o cenário que pede liga o pós-efeito (bloom, cor); os outros ficam como estão.
+            PostFx.Apply(cam, null);
 
             EnvironmentLook look;
             switch (id)
@@ -167,23 +171,31 @@ namespace Cacheta.App
         }
 
         // ================================================================== 1. Tio Beto: fundos do bar
+        // Boteco de bairro: balcão de azulejo com estufa de salgados no fundo, à esquerda, com a geladeira de bebidas
+        // e a prateleira de cachaças atrás; freezer de picolé, quadro de preços e TV num suporte; porta de enrolar
+        // aberta para a rua à direita. Peças 3D do pacote BarDoTioBeto (grátis do Poly Haven e próprias feitas com IA),
+        // texturas próprias (ladrilho hidráulico, azulejo, quadros) e luz de boteco: lâmpadas fluorescentes, geladeira
+        // e TV acesas, com bloom e cor quente. Sem o pacote baixado, cada peça volta a ser de formas simples.
         private static EnvironmentLook BarDoTioBeto(Transform r, Camera cam)
         {
             var red = new Color(0.72f, 0.3f, 0.22f);
             var s = new RoomSpec
             {
-                Floor = Color.white, FloorTex = Checker(red, new Color(0.62f, 0.24f, 0.18f)), FloorTile = 0.6f,
-                Wall = new Color(0.96f, 0.88f, 0.64f),
-                Wainscot = Color.white, WainscotTex = Grid(new Color(0.36f, 0.64f, 0.56f), new Color(0.9f, 0.92f, 0.88f)), WainscotTile = 0.15f,
-                WainscotHeight = 1.4f,
-                Ceiling = new Color(0.93f, 0.9f, 0.84f), Trim = new Color(0.55f, 0.57f, 0.6f),
+                Floor = Color.white, FloorTex = Art("Bar/ladrilho") ?? Checker(red, new Color(0.62f, 0.24f, 0.18f)), FloorTile = 0.4f,
+                Wall = Color.white, WallTex = Art("Bar/parede"), WallTile = 2f,
+                Wainscot = Color.white, WainscotTex = Art("Bar/azulejo") ?? Grid(new Color(0.36f, 0.64f, 0.56f), new Color(0.9f, 0.92f, 0.88f)),
+                WainscotTile = 0.6f, WainscotHeight = 1.4f, WainscotTrim = new Color(0.16f, 0.42f, 0.34f),
+                Ceiling = Color.white, CeilingTex = Art("Bar/forro"), CeilingTile = 1f, Trim = new Color(0.55f, 0.57f, 0.6f),
                 SunPatch = new Color(0.98f, 0.62f, 0.44f, 1f),
             };
+            if (s.WallTex == null) s.Wall = new Color(0.96f, 0.88f, 0.64f);
+            if (s.CeilingTex == null) s.Ceiling = new Color(0.93f, 0.9f, 0.84f);
             // Porta de enrolar levantada, do lado direito do fundo: dá para a calçada e a rua.
             s.Openings.Add(new Opening(Side.Fundo, 0.4f, 4.9f, 2.85f, Kind.PortaDeEnrolar));
             Room(r, s);
             Sky(cam, new Color(0.66f, 0.84f, 0.96f));
-            Light(r, new Color(1f, 0.9f, 0.72f), 1.05f, new Vector3(48, -22, 0), new Color(0.48f, 0.42f, 0.4f));
+            Light(r, new Color(1f, 0.88f, 0.7f), 0.9f, new Vector3(48, -22, 0), new Color(0.42f, 0.36f, 0.32f));
+            PostFx.Apply(cam, PostLook.Boteco);
 
             // Lá fora: calçada, rua e casas do outro lado.
             Street(P(r, "o15"), new Color(0.8f, 0.77f, 0.72f));
@@ -199,27 +211,124 @@ namespace Cacheta.App
             }
             Tree(P(r, "o17"), new Vector3(6.5f, 0, D + 3.2f), 2.4f, new Color(0.24f, 0.5f, 0.24f), 2.2f);
             LampPost(P(r, "o18"), new Vector3(-1.5f, 0, D + 3.0f));
+            SidewalkBoard(P(r, "o26"), new Vector3(1.7f, 0, D + 0.75f), 196f);
+            if (Prop(P(r, "o27"), "Lixeira", new Vector3(4.35f, 0, D + 0.6f), 160f) == null)
+                Palette.Prim(PrimitiveType.Cylinder, P(r, "o27"), new Vector3(4.35f, 0.4f, D + 0.6f), new Vector3(0.5f, 0.4f, 0.5f), new Color(0.62f, 0.64f, 0.66f), "Lixeira");
 
-            // Dentro: geladeiras, balcão, prateleira de garrafas, quadro de preços, TV, engradados.
-            Fridge(P(r, "o1"), new Vector3(-4.3f, 0, D - 0.42f), 0f, new Color(0.86f, 0.18f, 0.16f));
-            Fridge(P(r, "o2"), new Vector3(-3.15f, 0, D - 0.42f), 0f, new Color(0.92f, 0.92f, 0.9f));
             var wood = new Color(0.5f, 0.3f, 0.18f);
-            Box(P(r, "o3"), new Vector3(-4.7f, 0.55f, -0.8f), new Vector3(0.9f, 1.1f, 3.6f), wood, "Balcão");
-            Box(P(r, "o3"), new Vector3(-4.65f, 1.13f, -0.8f), new Vector3(1.05f, 0.06f, 3.7f), new Color(0.86f, 0.82f, 0.72f));
-            Shelf(P(r, "o4"), new Vector3(-W + 0.16f, 1.95f, -0.8f), 3.2f, wood);
-            Chalkboard(P(r, "o5"), new Vector3(-1.3f, 1.9f, D - 0.03f), 1.5f, 0.95f);
-            Clock(P(r, "o6"), new Vector3(-1.3f, 2.85f, D - 0.04f));
-            Tv(P(r, "o7"), new Vector3(W - 0.1f, 2.45f, 1.6f));
-            Crates(P(r, "o8"), new Vector3(4.55f, 0, -0.6f), 3, new[] { new Color(0.95f, 0.78f, 0.1f), new Color(0.88f, 0.26f, 0.2f) });
-            Crates(P(r, "o9"), new Vector3(4.55f, 0, -1.35f), 2, new[] { new Color(0.88f, 0.26f, 0.2f), new Color(0.95f, 0.78f, 0.1f) });
+
+            // Fundo, atrás do balcão: geladeira de bebidas, prateleira de cachaças, botijão e engradados.
+            var o1 = P(r, "o1");
+            if (Prop(o1, "Geladeira", new Vector3(-4.65f, 0, D - 0.4f), 180f) != null)
+                Lamp(o1, new Vector3(-4.65f, 1.2f, D - 1.05f), new Color(0.82f, 0.92f, 1f), 0.9f, 2.2f);
+            else Fridge(o1, new Vector3(-4.65f, 0, D - 0.42f), 0f, new Color(0.86f, 0.18f, 0.16f));
+            if (Prop(P(r, "o4"), "Prateleira", new Vector3(-3.35f, 1.3f, D), 180f) == null)
+                Shelf(Group(P(r, "o4"), new Vector3(-3.35f, 0, D - 0.16f), 90f, "Prateleira"), new Vector3(0, 1.45f, 0), 1.6f, wood);
+            if (Prop(P(r, "o24"), "Botijao", new Vector3(-2.3f, 0, D - 0.3f), 30f) == null)
+                Palette.Prim(PrimitiveType.Capsule, P(r, "o24"), new Vector3(-2.3f, 0.3f, D - 0.3f), new Vector3(0.36f, 0.3f, 0.36f), new Color(0.2f, 0.4f, 0.75f), "Botijão");
+            if (Prop(P(r, "o9"), "Engradados", new Vector3(-1.85f, 0, D - 0.3f), 190f) == null)
+                Crates(P(r, "o9"), new Vector3(-1.85f, 0, D - 0.35f), 3, new[] { new Color(0.88f, 0.26f, 0.2f), new Color(0.95f, 0.78f, 0.1f) });
+            if (Prop(P(r, "o6"), "Relogio", new Vector3(-4.65f, 2.5f, D), 180f) == null) Clock(P(r, "o6"), new Vector3(-4.65f, 2.5f, D - 0.02f));
+            WallArt(P(r, "o19"), Side.Fundo, -3.35f, 2.55f, new Vector2(0.96f, 0.54f), Art("Bar/fiado"), wood, 0.03f, "Fiado só amanhã");
+
+            // O balcão, de frente para a mesa, com rádio e estufa acesa; três banquetas na frente.
+            var o3 = P(r, "o3");
+            var counter = Group(o3, new Vector3(-3.3f, 0, 2.95f), 180f, "Balcão do Tio Beto");
+            if (Prop(counter, "Balcao", Vector3.zero, 0f, 0.945f) != null)
+            {
+                // A estufa fica na ponta direita de quem olha da mesa (x local negativo no modelo).
+                Lamp(counter, new Vector3(-1.45f, 1.4f, -0.1f), new Color(1f, 0.72f, 0.38f), 0.9f, 1.6f);
+                if (Prop(counter, "Radio", new Vector3(0.95f, 1.035f, -0.2f), 8f) == null)
+                    Box(counter, new Vector3(0.95f, 1.15f, -0.2f), new Vector3(0.4f, 0.24f, 0.1f), new Color(0.2f, 0.2f, 0.22f), "Rádio");
+            }
+            else
+            {
+                Box(counter, new Vector3(0, 0.55f, 0), new Vector3(3.4f, 1.1f, 0.9f), Color.white, "Balcão").GetComponent<Renderer>().sharedMaterial =
+                    TexMat(s.WainscotTex, new Vector2(3.4f / 0.6f, 1.1f / 0.6f));
+                Box(counter, new Vector3(0, 1.13f, 0.02f), new Vector3(3.5f, 0.06f, 1.0f), new Color(0.86f, 0.82f, 0.72f), "Tampo");
+            }
+            var o21 = P(r, "o21");
+            for (int i = 0; i < 3; i++)
+            {
+                var pos = new Vector3(-4.3f + i * 0.9f, 0, 2.15f);
+                if (Prop(o21, "Banqueta", pos, i * 37f) == null) Stool(o21, pos, new Color(0.85f, 0.2f, 0.18f));
+            }
+
+            // Fundo, do lado do cliente: freezer de picolé, quadro de preços, TV no suporte e a espada-de-são-jorge.
+            if (Prop(P(r, "o2"), "Freezer", new Vector3(-0.95f, 0, D - 0.4f), 180f) == null)
+                Fridge(P(r, "o2"), new Vector3(-0.95f, 0, D - 0.42f), 0f, new Color(0.92f, 0.92f, 0.9f));
+            var board = Art("Bar/precos");
+            if (board != null) WallArt(P(r, "o5"), Side.Fundo, -0.95f, 1.68f, new Vector2(1.26f, 0.84f), board, wood, 0.04f, "Quadro de preços");
+            else Chalkboard(P(r, "o5"), new Vector3(-0.95f, 1.68f, D - 0.03f), 1.26f, 0.84f);
+            TvOnBracket(P(r, "o7"), new Vector3(-0.95f, 2.3f, D));
+            if (Prop(P(r, "o22"), "Planta", new Vector3(0.02f, 0, D - 0.3f), 15f) == null)
+                Palette.Prim(PrimitiveType.Cylinder, P(r, "o22"), new Vector3(0.02f, 0.15f, D - 0.3f), new Vector3(0.36f, 0.15f, 0.36f), new Color(0.72f, 0.38f, 0.22f), "Vaso");
+
+            // Lado direito: estante de aço com caixas, engradados, cartaz do torneio e a foto do time do bairro.
+            if (Prop(P(r, "o23"), "Estante", new Vector3(W - 0.24f, 0, 3.95f), -90f) == null)
+                Bookcase(P(r, "o23"), new Vector3(W - 0.25f, 0, 3.95f), 0.95f, new Color(0.25f, 0.25f, 0.27f), new[] { new Color(0.76f, 0.6f, 0.4f) });
+            if (Prop(P(r, "o8"), "Engradados", new Vector3(W - 0.35f, 0, 2.75f), -75f) == null)
+                Crates(P(r, "o8"), new Vector3(W - 0.35f, 0, 2.75f), 3, new[] { new Color(0.95f, 0.78f, 0.1f), new Color(0.88f, 0.26f, 0.2f) });
+            WallArt(P(r, "o11"), Side.Direita, 1.9f, 1.8f, new Vector2(0.62f, 0.93f), Art("Bar/cartaz"), new Color(0.95f, 0.95f, 0.92f), 0.015f, "Cartaz do torneio");
+            WallArt(P(r, "o20"), Side.Direita, 0.75f, 1.85f, new Vector2(0.56f, 0.42f), Art("Bar/foto-time"), new Color(0.3f, 0.2f, 0.12f), 0.045f, "Foto do time");
             StackedChairs(P(r, "o10"), new Vector3(4.3f, 0, -3.8f), PlasticWhite, 4, monobloc: true);
-            Poster(P(r, "o11"), Side.Direita, -2.6f, 1.9f, 0.7f, 1.0f, new Color(0.98f, 0.95f, 0.85f), new Color(0.2f, 0.55f, 0.3f));
-            TubeLight(P(r, "o12"), new Vector3(-2.2f, H, 0.2f), true);
-            TubeLight(P(r, "o13"), new Vector3(2.2f, H, -1.6f), true);
-            Fan(P(r, "o14"), new Vector3(0, H, 0.6f), new Color(0.9f, 0.9f, 0.88f));
+
+            // Teto: duas luminárias fluorescentes acesas e o ventilador girando.
+            TubeLamp(P(r, "o12"), new Vector3(-2.0f, H, 2.0f));
+            TubeLamp(P(r, "o13"), new Vector3(1.6f, H, 0.4f));
+            var fan = Prop(P(r, "o14"), "Ventilador", new Vector3(0, H, 0.6f), 20f, 1f, shadows: false);
+            if (fan != null) PropLibrary.Part(fan, "ceiling_fan_blades")?.gameObject.AddComponent<Spin>();
+            else Fan(P(r, "o14"), new Vector3(0, H, 0.6f), new Color(0.9f, 0.9f, 0.88f));
 
             // Mesa e cadeiras de plástico branco, de bar.
             return new EnvironmentLook { Table = PlasticWhite, TableEdge = new Color(0.86f, 0.86f, 0.84f), Chair = PlasticWhite, Monobloc = true };
+        }
+
+        /// <summary>TV de tubo num suporte de parede (no fundo, virada para a sala), passando um jogo.</summary>
+        private static void TvOnBracket(Transform r, Vector3 wall)
+        {
+            var g = Group(r, wall, 180f, "TV no suporte");
+            var metal = new Color(0.22f, 0.22f, 0.24f);
+            Box(g, new Vector3(0, 0.12f, 0.01f), new Vector3(0.22f, 0.3f, 0.02f), metal, "Suporte");
+            Box(g, new Vector3(0, -0.02f, 0.2f), new Vector3(0.06f, 0.05f, 0.38f), metal);
+            Box(g, new Vector3(0, -0.035f, 0.38f), new Vector3(0.5f, 0.03f, 0.46f), metal);
+            var game = Art("Bar/tv-jogo");
+            var tv = Prop(g, "TV", new Vector3(0, -0.02f, 0.38f), 0f);
+            if (tv != null)
+            {
+                if (game != null) Picture(tv.transform, new Vector3(0, 0.383f, 0.266f), 0f, new Vector2(0.47f, 0.34f), game, 1.6f, "Tela");
+            }
+            else
+            {
+                Box(g, new Vector3(0, 0.29f, 0.38f), new Vector3(0.62f, 0.6f, 0.46f), new Color(0.1f, 0.1f, 0.11f), "TV");
+                if (game != null) Picture(g, new Vector3(0, 0.33f, 0.615f), 0f, new Vector2(0.5f, 0.38f), game, 1.6f, "Tela");
+            }
+            Lamp(g, new Vector3(0, 0.3f, 1.1f), new Color(0.62f, 0.82f, 1f), 0.7f, 2.4f);
+        }
+
+        /// <summary>Luminária com duas lâmpadas fluorescentes, acesa (com brilho e luz de verdade).</summary>
+        private static void TubeLamp(Transform r, Vector3 ceiling)
+        {
+            if (Prop(r, "Luminaria", ceiling, 0f, 1f, shadows: false) == null) TubeLight(r, ceiling, true);
+            Lamp(r, ceiling - new Vector3(0, 0.35f, 0), new Color(1f, 0.93f, 0.8f), 1.9f, 7f);
+        }
+
+        /// <summary>Cavalete de giz na calçada, com o prato do dia (as duas tábuas em A).</summary>
+        private static void SidewalkBoard(Transform r, Vector3 pos, float yaw)
+        {
+            var g = Group(r, pos, yaw, "Cavalete");
+            var wood = new Color(0.55f, 0.36f, 0.2f);
+            var art = Art("Bar/cavalete");
+            for (int side = -1; side <= 1; side += 2)
+            {
+                var leaf = new GameObject(side < 0 ? "Tábua da frente" : "Tábua de trás").transform;
+                leaf.SetParent(g, false);
+                leaf.localPosition = new Vector3(0, 0, 0);
+                leaf.localRotation = Quaternion.Euler(side * 12f, side < 0 ? 0f : 180f, 0);
+                Box(leaf, new Vector3(0, 0.48f, 0.0f), new Vector3(0.58f, 0.96f, 0.03f), wood, "Moldura");
+                if (art != null) Picture(leaf, new Vector3(0, 0.5f, 0.017f), 0f, new Vector2(0.5f, 0.75f), art, 0f, "Lousa");
+                else Box(leaf, new Vector3(0, 0.5f, 0.017f), new Vector3(0.5f, 0.75f, 0.005f), new Color(0.12f, 0.14f, 0.13f), "Lousa");
+            }
         }
 
         // ================================================================== 2. Dona Cleide: salão de bingo do bairro
@@ -608,6 +717,8 @@ namespace Cacheta.App
             float wh = s.WainscotHeight;
             if (wh > y0) Piece(r, s, side, a, b, y0, Mathf.Min(y1, wh), s.Wainscot, s.WainscotTex, s.WainscotTile, "Barrado");
             if (y1 > wh) Piece(r, s, side, a, b, Mathf.Max(y0, wh), y1, s.Wall, s.WallTex, s.WallTile, "Parede");
+            if (s.WainscotTrim.a > 0 && wh > y0 && wh < y1 && b - a > 0.01f)
+                Box(r, At(side, (a + b) / 2, wh, 0.008f), Dim(side, b - a, 0.045f, 0.016f), s.WainscotTrim, "Filete do azulejo");
         }
 
         private static void Piece(Transform r, RoomSpec s, Side side, float a, float b, float y0, float y1, Color c, Texture2D tex, float tile, string name)
@@ -1199,6 +1310,70 @@ namespace Cacheta.App
                 float a = i * Mathf.PI / 4;
                 Glow(r, ceiling + new Vector3(Mathf.Cos(a) * 0.58f, -0.5f, Mathf.Sin(a) * 0.58f), Vector3.one * 0.13f, new Color(1f, 0.92f, 0.7f), "Lâmpada", PrimitiveType.Sphere);
             }
+        }
+
+        // ================================================================== peças 3D, quadros e luzes
+
+        private static string _pack;
+
+        /// <summary>Peça 3D do pacote do cenário (veja <see cref="PropLibrary"/>). Nulo se o pacote não foi baixado.</summary>
+        private static GameObject Prop(Transform r, string prop, Vector3 pos, float yaw = 0f, float scale = 1f, bool shadows = true)
+            => PropLibrary.Spawn(r, _pack, prop, pos, yaw, scale, shadows);
+
+        /// <summary>Textura própria do cenário (Assets/Resources/Texturas). Nula se não existir.</summary>
+        private static Texture2D Art(string name) => Resources.Load<Texture2D>("Texturas/" + name);
+
+        /// <summary>
+        /// Imagem num retângulo (quadro, cartaz, tela). <paramref name="yaw"/> é para onde a frente olha (0 = +Z).
+        /// Com <paramref name="glow"/> maior que zero, brilha sozinha (telas acesas).
+        /// </summary>
+        private static GameObject Picture(Transform p, Vector3 pos, float yaw, Vector2 size, Texture2D tex, float glow, string name = null)
+        {
+            var go = Palette.Prim(PrimitiveType.Quad, p, pos, new Vector3(size.x, size.y, 1f), Color.white, name);
+            go.transform.localRotation = Quaternion.Euler(0, yaw + 180f, 0); // o Quad do Unity olha para -Z
+            var m = Palette.ToonTextured(tex, Color.white);
+            m.SetFloat("_OutlineWidth", 0f);
+            if (glow > 0)
+            {
+                m.SetColor("_EmissionColor", Color.white * glow);
+                m.SetTexture("_EmissionMap", tex);
+                m.color = new Color(0.25f, 0.25f, 0.25f);
+            }
+            var rend = go.GetComponent<Renderer>();
+            rend.sharedMaterial = m;
+            rend.shadowCastingMode = ShadowCastingMode.Off;
+            return go;
+        }
+
+        /// <summary>Quadro na parede: moldura e a imagem por cima. Sem a imagem, fica um pôster de cor lisa.</summary>
+        private static void WallArt(Transform r, Side side, float u, float y, Vector2 size, Texture2D tex, Color frame, float border, string name)
+        {
+            if (tex == null)
+            {
+                Poster(r, side, u, y, size.x, size.y, new Color(0.98f, 0.95f, 0.85f), new Color(0.75f, 0.25f, 0.2f));
+                return;
+            }
+            float yaw = side == Side.Fundo ? 180f : side == Side.Esquerda ? 90f : -90f;
+            if (border > 0) Box(r, At(side, u, y, 0.012f), Dim(side, size.x + 2 * border, size.y + 2 * border, 0.024f), frame, name);
+            Picture(r, At(side, u, y, 0.026f), yaw, size, tex, 0f, border > 0 ? "Imagem" : name);
+        }
+
+        /// <summary>Lâmpada de verdade (luz de ponto, sem sombra): esquenta o que está em volta.</summary>
+        private static Light Lamp(Transform p, Vector3 pos, Color c, float intensity, float range)
+        {
+            var go = new GameObject("Luz");
+            go.transform.SetParent(p, false);
+            go.transform.localPosition = pos;
+            var l = go.AddComponent<Light>();
+            l.type = LightType.Point;
+            l.color = c;
+            l.intensity = intensity;
+            l.range = range;
+            l.shadows = LightShadows.None;
+            l.renderMode = LightRenderMode.ForcePixel;
+            // As luzes por pixel passam do limite padrão da qualidade (4 ou menos).
+            if (QualitySettings.pixelLightCount < 8) QualitySettings.pixelLightCount = 8;
+            return l;
         }
 
         // ================================================================== peças básicas
